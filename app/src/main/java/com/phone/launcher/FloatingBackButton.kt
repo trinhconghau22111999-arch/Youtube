@@ -149,18 +149,20 @@ object FloatingBackButton {
         private val lp: WindowManager.LayoutParams,
         private val root: ViewGroup,
         private val resyncCallback: () -> Unit,
-        // [fixed]: true = nút cố định, không đăng ký vào callbacksFor(id) (nút cố định không
-        // bao giờ kéo-thả nên không cần đẩy vị trí sang các Activity khác cùng tiến trình).
         private val fixed: Boolean
     ) {
+        // Lưu trạng thái visible hiện tại - resync() chỉ cập nhật vị trí, KHÔNG đổi visibility
+        private var currentlyVisible: Boolean = true
+
         fun resync() {
             resyncCallback()
+            // Khôi phục visibility sau resync (resyncCallback -> ensureWindowAdded có thể show lại)
+            btn.visibility = if (currentlyVisible) View.VISIBLE else View.GONE
         }
 
-        /** Ẩn/hiện nút nổi này (ví dụ nút "Off" chỉ hiện khi đang ở trang YouTube). Vẫn giữ
-         *  nguyên trong WindowManager (không remove/add lại) - chỉ đổi visibility của View, nên
-         *  khi hiện lại vị trí vẫn y nguyên chỗ cũ, không bị "nhảy" hay tính lại từ đầu. */
+        /** Ẩn/hiện nút nổi - lưu trạng thái để resync() không vô tình show lại. */
         fun setVisible(visible: Boolean) {
+            currentlyVisible = visible
             btn.visibility = if (visible) View.VISIBLE else View.GONE
         }
 
@@ -258,6 +260,8 @@ object FloatingBackButton {
             val token = activity.window?.decorView?.windowToken ?: return
             lp.token = token
             try {
+                // Bắt đầu với GONE - setVisible(true) sẽ hiện sau khi cần
+                btn.visibility = View.GONE
                 wm.addView(btn, lp)
                 windowAdded = true
             } catch (e: Exception) {
