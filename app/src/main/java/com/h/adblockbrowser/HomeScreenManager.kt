@@ -187,7 +187,7 @@ class HomeScreenManager(
         // dáng "Live Tile Windows Phone" nữa. Xếp 2 CỘT x 2 HÀNG bằng LinearLayout lồng nhau đơn
         // giản (không cần GridPlacer/GridLayout phức tạp - chỉ 4 ô cố định, không cần thuật toán
         // chiếm-dụng-ô-linh-hoạt của lưới Live Tile bên dưới).
-        val fixedKeys = listOf("youtube", "incognito", "accounts", "files")
+        val fixedKeys = listOf("youtube", "incognito")
         val fixedSection = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 0, 0, dp(8))
