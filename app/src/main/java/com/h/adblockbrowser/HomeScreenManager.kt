@@ -221,16 +221,12 @@ class HomeScreenManager(
                         val launch = pm.getLaunchIntentForPackage(pkgName)
                         if (launch != null) { launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); context.startActivity(launch) }
                     },
-                    onLongPress = { anchor ->
-                        // fixedKeys rỗng: 4 nút cố định không còn tham gia lưới Live Tile nữa
-                        // (xem [buildSimpleAppIcon]), nên không còn tile nào có tag khớp trong
-                        // fixedKeys để hoán đổi vị trí cùng - tham số này chỉ còn ý nghĩa hình
-                        // thức, giữ lại để khớp chữ ký [startTileDrag].
-                        startTileDrag(anchor, pkgName, false, mutableListOf(), userKeys, gridContainer, cellPitchPx)
-                    }
+                    onLongPress = {}
                 )
-                tile.tag = pkgName  // tag để enterDragMode nhận diện
+                tile.tag = pkgName
                 addTile(tile, size)
+                // Nhấn giữ 1.5s → kéo để di chuyển tile
+                attachDragToTile(tile, pkgName, userKeys, gridContainer, cellPitchPx)
             }
         }
 
@@ -332,8 +328,6 @@ class HomeScreenManager(
         val menuBox = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply { setColor(0xFF1A1A1A.toInt()); setStroke(dp(1), 0xFF3A3A3A.toInt()) }
-            addView(item("Đổi vị trí") { enterDragMode(tile, id, isFixed, fixedKeys, userKeys, gridContainer) })
-            addView(div())
             addView(item("Đổi kích cỡ") {
                 enterResizeMode(tile, gridContainer, cellPitchPx) { picked ->
                     if (isFixed) TileSizeStore.set(context, id, picked)
@@ -355,7 +349,187 @@ class HomeScreenManager(
         builtPopup.showSmartDropDown(tile)
     }
 
-    /** Chế độ đổi vị trí: tile đang giữ mờ đi, chạm vào tile khác → SWAP, chạm ngoài → huỷ. */
+    /**
+     * Nhấn giữ 1.5s → kéo tile di chuyển tự do theo ngón tay.
+     * Thả vào ÔI TRỐNG → SWAP vị trí 2 tile + lưu thứ tự mới.
+     * Thả vào Ô ĐÃ CÓ TILE → tile trở về chỗ cũ (animate).
+     * Thả ra ngoài lưới → về chỗ cũ.
+     */
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun attachDragToTile(
+        tile: View,
+        pkgName: String,
+        userKeys: MutableList<String>,
+        gridContainer: FrameLayout,
+        cellPitchPx: Int
+    ) {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        var isDragging = false
+        var longPressTriggered = false
+        var downRawX = 0f
+        var downRawY = 0f
+        // Vị trí gốc của tile trong gridContainer (leftMargin, topMargin)
+        var origLeft = 0
+        var origTop = 0
+        // Vị trí tile hiện tại khi bắt đầu drag (toạ độ trong gridContainer)
+        var startTileX = 0f
+        var startTileY = 0f
+
+        val longPressRunnable = Runnable {
+            if (!isDragging) {
+                longPressTriggered = true
+                isDragging = true
+                // Lưu vị trí gốc
+                val lp = tile.layoutParams as FrameLayout.LayoutParams
+                origLeft = lp.leftMargin
+                origTop = lp.topMargin
+                startTileX = tile.x
+                startTileY = tile.y
+                // Hiệu ứng "nhấc lên": phóng to nhẹ + mờ
+                tile.animate().scaleX(1.08f).scaleY(1.08f).alpha(0.75f).setDuration(120).start()
+                tile.bringToFront()
+                // Rung nhẹ báo hiệu bắt đầu drag
+                try {
+                    val vib = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                    @Suppress("DEPRECATION")
+                    if (android.os.Build.VERSION.SDK_INT >= 26)
+                        vib.vibrate(android.os.VibrationEffect.createOneShot(30, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                    else
+                        vib.vibrate(30)
+                } catch (e: Exception) { }
+            }
+        }
+
+        tile.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    longPressTriggered = false
+                    isDragging = false
+                    handler.postDelayed(longPressRunnable, 1500)
+                    false // không nuốt - cho click vẫn hoạt động
+                }
+
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - downRawX
+                    val dy = event.rawY - downRawY
+                    // Huỷ long press nếu ngón tay di chuyển quá 10dp trước khi hết 1.5s
+                    if (!longPressTriggered && (Math.abs(dx) > dp(10) || Math.abs(dy) > dp(10))) {
+                        handler.removeCallbacks(longPressRunnable)
+                    }
+                    if (isDragging) {
+                        // Di chuyển tile theo ngón tay
+                        v.x = startTileX + dx
+                        v.y = startTileY + dy
+                        // Highlight ô đang hover
+                        highlightDropZone(v, gridContainer, cellPitchPx)
+                        true
+                    } else false
+                }
+
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(longPressRunnable)
+                    if (isDragging) {
+                        isDragging = false
+                        longPressTriggered = false
+                        // Tính ô grid mà tile đang thả vào (trung tâm tile)
+                        val tileCenterX = v.x + v.width / 2f
+                        val tileCenterY = v.y + v.height / 2f
+                        val dropCol = (tileCenterX / cellPitchPx).toInt().coerceIn(0, 2)
+                        val dropRow = (tileCenterY / cellPitchPx).toInt().coerceAtLeast(0)
+
+                        // Tìm tile nào đang ở ô đó
+                        var targetTile: View? = null
+                        var targetPkg: String? = null
+                        for (i in 0 until gridContainer.childCount) {
+                            val child = gridContainer.getChildAt(i)
+                            if (child === v) continue
+                            val clp = child.layoutParams as? FrameLayout.LayoutParams ?: continue
+                            val childCol = (clp.leftMargin / cellPitchPx)
+                            val childRow = (clp.topMargin / cellPitchPx)
+                            if (childCol == dropCol && childRow == dropRow) {
+                                targetTile = child
+                                targetPkg = child.tag as? String
+                                break
+                            }
+                        }
+
+                        val lp = v.layoutParams as FrameLayout.LayoutParams
+
+                        if (targetTile != null && targetPkg != null) {
+                            // Ô đã có tile → KHÔNG cho đẩy → về chỗ cũ
+                            v.animate().x(origLeft.toFloat()).y(origTop.toFloat())
+                                .scaleX(1f).scaleY(1f).alpha(1f).setDuration(200).start()
+                        } else {
+                            // Ô trống → SWAP vị trí trong layout + lưu thứ tự
+                            val newLeft = dropCol * cellPitchPx + dp(2)
+                            val newTop = dropRow * cellPitchPx + dp(2)
+                            // Snap tile vào đúng ô grid
+                            v.animate().x(newLeft.toFloat()).y(newTop.toFloat())
+                                .scaleX(1f).scaleY(1f).alpha(1f).setDuration(150)
+                                .withEndAction {
+                                    lp.leftMargin = newLeft
+                                    lp.topMargin = newTop
+                                    v.layoutParams = lp
+                                    v.x = newLeft.toFloat()
+                                    v.y = newTop.toFloat()
+                                    // Cập nhật thứ tự trong userKeys theo vị trí y (trên→dưới)
+                                    reorderUserKeysByPosition(userKeys, gridContainer)
+                                    PinnedOrderStore.saveUserOrder(context, userKeys)
+                                }.start()
+                        }
+                        // Bỏ highlight
+                        clearDropZoneHighlight(gridContainer)
+                        true
+                    } else {
+                        false
+                    }
+                }
+                else -> false
+            }
+        }
+    }
+
+    /** Highlight nhẹ ô grid mà tile đang hover lên (viền trắng nhấp nháy). */
+    private fun highlightDropZone(dragging: View, gridContainer: FrameLayout, cellPitchPx: Int) {
+        val cx = dragging.x + dragging.width / 2f
+        val cy = dragging.y + dragging.height / 2f
+        val col = (cx / cellPitchPx).toInt().coerceIn(0, 2)
+        val row = (cy / cellPitchPx).toInt().coerceAtLeast(0)
+        for (i in 0 until gridContainer.childCount) {
+            val child = gridContainer.getChildAt(i)
+            if (child === dragging) continue
+            val clp = child.layoutParams as? FrameLayout.LayoutParams ?: continue
+            val childCol = clp.leftMargin / cellPitchPx
+            val childRow = clp.topMargin / cellPitchPx
+            child.alpha = if (childCol == col && childRow == row) 0.5f else 1f
+        }
+    }
+
+    private fun clearDropZoneHighlight(gridContainer: FrameLayout) {
+        for (i in 0 until gridContainer.childCount) {
+            gridContainer.getChildAt(i).alpha = 1f
+        }
+    }
+
+    /** Sắp xếp lại userKeys theo vị trí thực tế của tile trên lưới (trên→dưới, trái→phải). */
+    private fun reorderUserKeysByPosition(userKeys: MutableList<String>, gridContainer: FrameLayout) {
+        data class TilePos(val pkg: String, val left: Int, val top: Int)
+        val positions = mutableListOf<TilePos>()
+        for (i in 0 until gridContainer.childCount) {
+            val child = gridContainer.getChildAt(i)
+            val pkg = child.tag as? String ?: continue
+            val lp = child.layoutParams as? FrameLayout.LayoutParams ?: continue
+            positions.add(TilePos(pkg, lp.leftMargin, lp.topMargin))
+        }
+        positions.sortWith(compareBy({ it.top }, { it.left }))
+        val newOrder = positions.map { it.pkg }
+        userKeys.clear()
+        userKeys.addAll(newOrder)
+    }
+
+        /** Chế độ đổi vị trí: tile đang giữ mờ đi, chạm vào tile khác → SWAP, chạm ngoài → huỷ. */
     private fun enterDragMode(
         dragTile: View, dragId: String, isFixed: Boolean,
         fixedKeys: MutableList<String>, userKeys: MutableList<String>,
