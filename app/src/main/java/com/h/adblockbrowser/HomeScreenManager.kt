@@ -20,8 +20,6 @@ import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.recyclerview.widget.RecyclerView
-import androidx.viewpager2.widget.ViewPager2
 
 /** Loại 1 mục trên trang chủ: mở thẳng 1 trang web (WEB) hay mở 1 Activity trong app (ACTIVITY). */
 enum class ShortcutType { WEB, ACTIVITY }
@@ -73,40 +71,27 @@ class HomeScreenManager(
 
     /** Giữ lại tham chiếu để [refreshPages] có thể dựng lại nội dung 2 trang ngay khi người
      *  dùng ghim/bỏ ghim 1 app, mà KHÔNG cần thoát vào lại trang chủ mới thấy cập nhật. */
-    private var pageAdapterRef: PageAdapter? = null
-    private var pagerRef: ViewPager2? = null
+    private var rootRef: FrameLayout? = null
 
-    /** Cuộn về trang "start" (trang 0) ngay lập tức - gọi khi bấm nút Home (Windows) hoặc Back
-     *  về màn chính, để trang Start luôn là trang hiển thị mặc định. */
+    /** Không còn trang DS Ứng Dụng nên goToStart() chỉ cần no-op / scroll lên đầu. */
     fun goToStart() {
-        pagerRef?.setCurrentItem(0, true)
+        (rootRef?.getChildAt(0) as? ScrollView)?.scrollTo(0, 0)
     }
 
-    /** Trả về true nếu đang đứng ở trang 1 "DS Ứng Dụng" - dùng để Back từ trang này
-     *  về trang "start" thay vì đưa app xuống nền ngay. */
-    fun isOnAppListPage(): Boolean = (pagerRef?.currentItem ?: 0) == 1
+    /** Không còn trang DS Ứng Dụng - luôn trả về false. */
+    fun isOnAppListPage(): Boolean = false
 
-    /** Dựng nội dung 2 trang Pivot ("start" + "ứng dụng") trong 1 ViewPager2. */
+    /** Dựng màn hình Start - chỉ 1 trang duy nhất, không còn ViewPager2/trang DS Ứng Dụng. */
     fun build(): FrameLayout {
         val root = FrameLayout(context).apply {
             setBackgroundColor(Color.TRANSPARENT)
         }
-
-        // ── ViewPager2: 2 TRANG Pivot vuốt ngang - trang 0 "start", trang 1 "ứng dụng" ──
-        val pages = mutableListOf(buildStartPage(), buildAppListPage())
-        val adapter = PageAdapter(pages)
-        pageAdapterRef = adapter
-        val pager = ViewPager2(context).apply {
-            id = View.generateViewId()
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            this.adapter = adapter
-            offscreenPageLimit = 1
-        }
-        pagerRef = pager
-        root.addView(pager)
-
+        rootRef = root
+        val startPage = buildStartPage()
+        (startPage.parent as? ViewGroup)?.removeView(startPage)
+        root.addView(startPage, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ))
         return root
     }
 
@@ -126,14 +111,15 @@ class HomeScreenManager(
      *  đúng lỗi người dùng gặp phải. post{} vì scrollTo() cần chạy SAU khi View mới đã layout
      *  xong (biết chiều cao thật), gọi ngay lúc addView xong sẽ không có tác dụng. */
     fun refreshPages() {
-        val adapter = pageAdapterRef ?: return
-        val prevStartScrollY = (adapter.pages.getOrNull(0) as? ScrollView)?.scrollY ?: 0
-        val prevAppListScrollY = (adapter.pages.getOrNull(1) as? ScrollView)?.scrollY ?: 0
-        adapter.pages[0] = buildStartPage()
-        adapter.pages[1] = buildAppListPage()
-        adapter.notifyDataSetChanged()
-        (adapter.pages[0] as? ScrollView)?.let { sv -> sv.post { sv.scrollTo(0, prevStartScrollY) } }
-        (adapter.pages[1] as? ScrollView)?.let { sv -> sv.post { sv.scrollTo(0, prevAppListScrollY) } }
+        // Không còn ViewPager2 - rebuild trực tiếp qua rootRef
+        val root = rootRef ?: return
+        val prevScrollY = (root.getChildAt(0) as? ScrollView)?.scrollY ?: 0
+        root.removeAllViews()
+        val startPage = buildStartPage()
+        root.addView(startPage, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ))
+        (startPage as? ScrollView)?.post { (startPage as? ScrollView)?.scrollTo(0, prevScrollY) }
     }
 
     /** Dựng TRANG "start" (trang trái - hiện mặc định): lưới Live Tile 3 cột, gồm các ô cố
@@ -308,144 +294,7 @@ class HomeScreenManager(
         val dedupPkg: String? = null
     )
 
-    /** Dựng TRANG "ứng dụng" (trang phải - vuốt sang mới thấy): 1 DANH SÁCH DUY NHẤT, LIÊN TỤC,
-     *  sắp xếp A-Z theo tên hiển thị, GỘP CHUNG app thật đã cài + 12 mục cố định "Điện thoại" -
-     *  KHÔNG còn tiêu đề phân nhóm nào (không danh mục, không chữ cái A/B/C...) - chỉ có ĐÚNG 1
-     *  ngoại lệ: nhóm app đã "ghim lên đầu trang" hiện Ở ĐẦU trang, CHỈ hiện khi có ít nhất 1 app
-     *  đã ghim (xem [StarredAppsStore]) - nhấn giữ 1 app rồi chọn "Ghim lên đầu trang" ở menu bật
-     *  lên (showPinContextMenu) để thêm vào đó - KHÔNG còn tiêu đề chữ báo hiệu phía trên nhóm
-     *  này nữa (trước đây là "★ ĐÃ ĐÁNH DẤU SAO"). App đã ghim vẫn hiện NGUYÊN VẸN ở đúng vị trí
-     *  A-Z của nó trong danh sách chính bên dưới - nhóm đầu trang chỉ là 1 BẢN SAO/lối tắt nổi
-     *  lên trên, không di chuyển hay xoá app khỏi danh sách chính. */
-    private fun buildAppListPage(): View {
-        val scrollView = ScrollView(context).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            // Chừa lề trái nhỉnh hơn lề phải 1 chút - trên màn hình rộng (máy tính bảng/ngang)
-            // toàn bộ nội dung bị dồn sát mép trái trông rất lệch, nhích nhẹ sang phải cho cân
-            // mắt hơn mà không phá bố cục danh sách 1 cột hiện có.
-            setPadding(dp(32), dp(40), dp(16), dp(24) + dp(WpNavBar.HEIGHT_DP))
-            overScrollMode = View.OVER_SCROLL_NEVER
-        }
 
-        val content = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        content.addView(sectionHeader("DS Ứng Dụng", smallHeader = true))
-
-        // ── ĐÃ BỎ danh sách app THẬT đã cài trên máy (installedApps()) khỏi trang "ứng dụng" -
-        // theo yêu cầu "Xóa hết app bên ngoài": trang này giờ CHỈ còn hiện 12 mục cố định của
-        // "Điện thoại" (buildFixedEntries()), không còn gộp thêm app bên ngoài (bên thứ 3) đã
-        // cài trên máy nữa, nên cũng KHÔNG cần logic loại trùng "app ảo" như trước (không còn
-        // app thật nào để so khớp/trùng với mục cố định). ──
-        val allEntries = buildFixedEntries().sortedBy { it.label.lowercase() }
-
-        // Dùng chung 1 closure dựng dòng app (tránh lặp lại) cho cả nhóm "ghim lên đầu trang" lẫn
-        // danh sách chính bên dưới.
-        fun addRow(entry: AppEntry) {
-            content.addView(buildAppListRow(
-                entry.label, entry.icon,
-                onClick = entry.onClick,
-                onLongPress = entry.onLongPress ?: {}
-            ))
-        }
-
-        // ── Nhóm "ghim lên đầu trang" đã bỏ theo yêu cầu "Xóa hết app bên ngoài": chỉ app THẬT
-        // (có pkgName) mới ghim được, mà trang này giờ không còn app thật nào nữa nên nhóm ghim
-        // luôn rỗng - bỏ hẳn để khỏi giữ code chết. ──
-
-        // ── Danh sách chính: 1 LIST DUY NHẤT, LIÊN TỤC, A-Z, KHÔNG tiêu đề phân nhóm nào. ──
-        allEntries.forEach { addRow(it) }
-
-        scrollView.addView(content)
-        return scrollView
-    }
-
-    /** 12 MỤC CỐ ĐỊNH luôn có mặt trong danh sách "ứng dụng" dù máy có cài app tương ứng hay
-     *  không (Gọi điện, Cuộc gọi, Nhắn tin, Danh bạ, Camera, Thư viện, Ghi âm, Ghi chú, Lịch,
-     *  Đồng hồ, Máy tính, Quản lý tập tin) - trả về dạng [AppEntry] để GỘP CHUNG với app thật rồi
-     *  sắp A-Z thành 1 danh sách duy nhất (xem [buildAppListPage]), KHÔNG còn đứng riêng thành 1
-     *  khối cố định đúng thứ tự như phiên bản trước. 8 mục đầu mở app HỆ THỐNG THẬT của máy qua
-     *  Intent chuẩn Android, 4 mục cuối (Lịch/Đồng hồ/Máy tính/Quản lý tập tin) mở THẲNG màn hình
-     *  có sẵn trong app qua [onOpenShortcut]. KHÔNG đánh dấu sao được (không phải app thật, không
-     *  có packageName) nên [AppEntry.onLongPress] = null. */
-    private fun buildFixedEntries(): List<AppEntry> {
-        fun launchSystem(intent: Intent, notFoundMsg: String) {
-            try {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Toast.makeText(context, notFoundMsg, Toast.LENGTH_SHORT).show()
-            }
-        }
-        // Dò xem 1 Intent NGẦM (implicit) sẽ được hệ thống chuyển tới APP THẬT nào (package
-        // name) NẾU bấm vào - dùng để so khớp loại trùng với danh sách app thật đã cài (xem
-        // [AppEntry.dedupPkg]), KHÔNG dùng để mở app (việc mở vẫn qua [launchSystem] như cũ,
-        // giữ nguyên hành vi bấm nút kể cả khi dò gói thất bại/không có quyền).
-        fun resolvePkg(intent: Intent): String? = try {
-            context.packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
-                ?.activityInfo?.packageName
-        } catch (e: Exception) { null }
-
-        fun entry(label: String, iconRes: Int, dedupPkg: String? = null, onClick: () -> Unit): AppEntry =
-            AppEntry(label, context.getDrawable(iconRes)!!, null, onClick, null, dedupPkg)
-
-        val dialIntent = Intent(Intent.ACTION_DIAL)
-        val callLogIntent = Intent(Intent.ACTION_VIEW, Uri.parse("content://call_log/calls"))
-        val messagingIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_MESSAGING)
-        val contactsIntent = Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.CONTENT_URI)
-        val cameraIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
-        val galleryIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_GALLERY)
-        val recorderIntent = Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION)
-        val noteCandidates = listOf(
-            "com.google.android.keep", "com.samsung.android.app.notes",
-            "com.miui.notes", "com.samsung.android.memo"
-        )
-        val installedNotePkg = noteCandidates.firstOrNull {
-            context.packageManager.getLaunchIntentForPackage(it) != null
-        }
-
-        return listOf(
-            entry("Gọi điện", R.drawable.ic_shortcut_phonecall, dedupPkg = resolvePkg(dialIntent)) {
-                launchSystem(dialIntent, "Không tìm thấy ứng dụng Gọi điện")
-            },
-            // "Cuộc gọi" (nhật ký) và "Gọi điện" (bàn phím quay số) ở TRÊN thường do CÙNG 1 app
-            // Điện thoại thật xử lý - dò riêng package của call_log (không dùng lại kết quả của
-            // dialIntent) để chính xác, phòng trường hợp hiếm 2 app khác nhau đảm nhiệm.
-            entry("Cuộc gọi", R.drawable.ic_shortcut_phonecall, dedupPkg = resolvePkg(callLogIntent)) {
-                launchSystem(callLogIntent, "Không tìm thấy nhật ký Cuộc gọi")
-            },
-            entry("Nhắn tin", R.drawable.ic_shortcut_messaging, dedupPkg = resolvePkg(messagingIntent)) {
-                launchSystem(messagingIntent, "Không tìm thấy ứng dụng Nhắn tin")
-            },
-            entry("Danh bạ", R.drawable.ic_shortcut_contacts, dedupPkg = resolvePkg(contactsIntent)) {
-                launchSystem(contactsIntent, "Không tìm thấy ứng dụng Danh bạ")
-            },
-            entry("Camera", R.drawable.ic_shortcut_camera, dedupPkg = resolvePkg(cameraIntent)) {
-                launchSystem(cameraIntent, "Không tìm thấy ứng dụng Camera")
-            },
-            entry("Thư viện", R.drawable.ic_shortcut_gallery, dedupPkg = resolvePkg(galleryIntent)) {
-                launchSystem(galleryIntent, "Không tìm thấy ứng dụng Thư viện ảnh")
-            },
-            entry("Ghi âm", R.drawable.ic_shortcut_recorder, dedupPkg = resolvePkg(recorderIntent)) {
-                launchSystem(recorderIntent, "Không tìm thấy ứng dụng Ghi âm")
-            },
-            entry("Ghi chú", R.drawable.ic_shortcut_notes, dedupPkg = installedNotePkg) {
-                val launch = installedNotePkg?.let { context.packageManager.getLaunchIntentForPackage(it) }
-                if (launch != null) {
-                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(launch)
-                } else {
-                    Toast.makeText(context, "Chưa cài ứng dụng Ghi chú nào", Toast.LENGTH_SHORT).show()
-                }
-            },
-            // Quản lý tệp mở màn hình NỘI BỘ của CHÍNH app này (xem ShortcutsRepository), không
-            // trỏ tới app ngoài nào -> KHÔNG có dedupPkg, chỉ loại trùng theo tên chữ như trước.
-            entry("Quản lý tập tin", R.drawable.ic_appicon_files) { onOpenShortcut(ShortcutsRepository.ALL.getValue("files")) }
-        )
-    }
 
     private fun startTileDrag(
         tile: View, id: String, isFixed: Boolean,
@@ -905,28 +754,6 @@ class HomeScreenManager(
         }
     }
 
-    /** Adapter tối giản cho ViewPager2: 2 trang (có thể được [refreshPages] dựng lại), bọc mỗi
-     *  View có sẵn vào 1 FrameLayout chứa cho từng vị trí. */
-    private class PageAdapter(val pages: MutableList<View>) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-            val container = FrameLayout(parent.context).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            }
-            return object : RecyclerView.ViewHolder(container) {}
-        }
-
-        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-            val container = holder.itemView as FrameLayout
-            container.removeAllViews()
-            val page = pages[position]
-            (page.parent as? ViewGroup)?.removeView(page)
-            container.addView(page)
-        }
-
-        override fun getItemCount(): Int = pages.size
-    }
 
     /** Tiêu đề lớn kiểu Pivot/Hub header của WP.
      *  [smallHeader]=true: dùng cho trang "DS Ứng Dụng" (28sp) để không chiếm quá nhiều không gian.

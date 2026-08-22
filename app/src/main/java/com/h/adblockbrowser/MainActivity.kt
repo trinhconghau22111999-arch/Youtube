@@ -298,7 +298,6 @@ class MainActivity : AppCompatActivity() {
         progressBar?.visibility = View.GONE
         pauseAllVideos()
         floatingOffButtonHandle?.setVisible(false)
-        // Luôn về trang "start" (trang 0) khi quay về màn chính - dù đang ở trang "DS Ứng Dụng"
         homeScreenManager.goToStart()
     }
 
@@ -847,10 +846,6 @@ class MainActivity : AppCompatActivity() {
             }
             homeOverlay.visibility != View.VISIBLE -> {
                 goHome()
-            }
-            homeScreenManager.isOnAppListPage() -> {
-                // Đang ở trang "DS Ứng Dụng" (trang 1) → Back về trang "start" (trang 0) trước
-                homeScreenManager.goToStart()
             }
             else -> {
                 super.onBackPressed()
