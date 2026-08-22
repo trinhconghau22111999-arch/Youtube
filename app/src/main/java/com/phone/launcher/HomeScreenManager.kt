@@ -154,9 +154,9 @@ class HomeScreenManager(
         // dụng - tile sau đó được ĐẶT VỊ TRÍ TUYỆT ĐỐI (FrameLayout, toạ độ tính bằng "đơn vị
         // ô" x kích thước 1 ô) thay vì thả trôi theo layout tự động, để chiều cao lồng nhiều
         // hàng của tile "Cao"/"To" không làm vỡ layout các tile lân cận.
-        // Thứ tự mặc định - có thể thay đổi khi người dùng kéo-thả
-        val defaultUserKeys = PinnedAppsStore.getAll(context)
-        val userKeys = PinnedOrderStore.getUserOrder(context, defaultUserKeys).toMutableList()
+        // Thứ tự các tile app người dùng ghim = đúng thứ tự đã ghim (không còn kéo-thả đổi vị
+        // trí nữa - tính năng "nhấn giữ rồi kéo để di chuyển tile" đã được GỠ BỎ theo yêu cầu).
+        val userKeys = PinnedAppsStore.getAll(context)
         val gridColumns = 3
         // Cỡ 1 "đơn vị" ô lưới = (bề ngang khả dụng của trang)/3 - lấy theo bề ngang MÀN HÌNH
         // THẬT (không cần đợi layout đo xong) trừ đi padding 2 bên dp(20) của scrollView, để ô
@@ -221,12 +221,10 @@ class HomeScreenManager(
                         val launch = pm.getLaunchIntentForPackage(pkgName)
                         if (launch != null) { launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); context.startActivity(launch) }
                     },
-                    onLongPress = {}
+                    onLongPress = { anchor -> showPinContextMenu(anchor, pkgName, gridContainer, cellPitchPx) }
                 )
                 tile.tag = pkgName
                 addTile(tile, size)
-                // Nhấn giữ 1.5s → kéo để di chuyển tile
-                attachDragToTile(tile, pkgName, userKeys, gridContainer, cellPitchPx)
             }
         }
 
@@ -292,289 +290,6 @@ class HomeScreenManager(
 
 
 
-    private fun startTileDrag(
-        tile: View, id: String, isFixed: Boolean,
-        fixedKeys: MutableList<String>, userKeys: MutableList<String>,
-        gridContainer: FrameLayout, cellPitchPx: Int
-    ) {
-        // "var...= null" (KHÔNG dùng lateinit) - vì removeBadge (dựng NGAY dưới đây) cần đọc
-        // popup TỪ BÊN TRONG 1 lambda cục bộ trước khi popup được gán giá trị thật (gán ở cuối
-        // hàm) - lateinit + "::popup.isInitialized" KHÔNG dùng được cho BIẾN CỤC BỘ (chỉ dùng
-        // được cho property member của class/object; dùng cho biến cục bộ là lỗi cú pháp
-        // "References to variables and parameters are unsupported", từng làm build thất bại).
-        // Biến nullable + "?." là cách chuẩn, an toàn cho trường hợp này.
-        var popup: PopupWindow? = null
-        // Dấu ✕ góc trên-trái CHỈ hiện với tile KHÔNG cố định (app người dùng tự ghim) - tile cố
-        // định (YouTube, Cài đặt...) không có khái niệm "loại bỏ khỏi start", giống hành vi cũ
-        // của mục "Bỏ ghim khỏi start" trong menu (cũng chỉ hiện khi !isFixed).
-        val removeBadge: View? = if (!isFixed && tile is FrameLayout) {
-            addRemoveBadge(tile) {
-                PinnedAppsStore.unpin(context, id)
-                popup?.dismiss()
-                refreshPages()
-            }
-        } else null
-        fun item(label: String, onTap: () -> Unit): TextView = TextView(context).apply {
-            text = label; textSize = 16f; setTextColor(Color.WHITE)
-            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-            setPadding(dp(22), dp(16), dp(22), dp(16)); minWidth = dp(200)
-            isClickable = true; isFocusable = true; background = pressedOverlay()
-            setOnClickListener { popup?.dismiss(); onTap() }
-        }
-        fun div() = View(context).apply {
-            setBackgroundColor(0xFF3A3A3A.toInt())
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1))
-        }
-        val menuBox = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply { setColor(0xFF1A1A1A.toInt()); setStroke(dp(1), 0xFF3A3A3A.toInt()) }
-            addView(item("Đổi kích cỡ") {
-                enterResizeMode(tile, gridContainer, cellPitchPx) { picked ->
-                    if (isFixed) TileSizeStore.set(context, id, picked)
-                    else TileSizeStore.setForPackage(context, id, picked)
-                    refreshPages()
-                }
-            })
-            if (!isFixed) { addView(div()); addView(item("Bỏ ghim khỏi start") { PinnedAppsStore.unpin(context, id); refreshPages() }) }
-        }
-        popup = PopupWindow(menuBox, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true).apply {
-            elevation = 0f; animationStyle = 0; isOutsideTouchable = true
-        }
-        // Dấu ✕ chỉ tồn tại trong lúc menu này còn mở - đóng menu bằng BẤT KỲ đường nào (chọn 1
-        // mục, chạm ra ngoài, hay tự bấm ✕) đều phải dọn nó đi, nếu không sẽ dính lại vĩnh viễn
-        // trên tile (vd chọn "Đổi vị trí" rồi huỷ giữa chừng, không mục nào gọi refreshPages()
-        // để tự dựng lại tile mới không có ✕).
-        val builtPopup = popup!!
-        builtPopup.setOnDismissListener { removeBadge?.let { (tile as? FrameLayout)?.removeView(it) } }
-        builtPopup.showSmartDropDown(tile)
-    }
-
-    /**
-     * Nhấn giữ 1.5s → kéo tile di chuyển tự do theo ngón tay.
-     * Thả vào ÔI TRỐNG → SWAP vị trí 2 tile + lưu thứ tự mới.
-     * Thả vào Ô ĐÃ CÓ TILE → tile trở về chỗ cũ (animate).
-     * Thả ra ngoài lưới → về chỗ cũ.
-     */
-    @android.annotation.SuppressLint("ClickableViewAccessibility")
-    private fun attachDragToTile(
-        tile: View,
-        pkgName: String,
-        userKeys: MutableList<String>,
-        gridContainer: FrameLayout,
-        cellPitchPx: Int
-    ) {
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        var isDragging = false
-        var longPressTriggered = false
-        var downRawX = 0f
-        var downRawY = 0f
-        // Vị trí gốc của tile trong gridContainer (leftMargin, topMargin)
-        var origLeft = 0
-        var origTop = 0
-        // Vị trí tile hiện tại khi bắt đầu drag (toạ độ trong gridContainer)
-        var startTileX = 0f
-        var startTileY = 0f
-
-        val longPressRunnable = Runnable {
-            if (!isDragging) {
-                longPressTriggered = true
-                isDragging = true
-                // Lưu vị trí gốc
-                val lp = tile.layoutParams as FrameLayout.LayoutParams
-                origLeft = lp.leftMargin
-                origTop = lp.topMargin
-                startTileX = tile.x
-                startTileY = tile.y
-                // Hiệu ứng "nhấc lên": phóng to nhẹ + mờ
-                tile.animate().scaleX(1.08f).scaleY(1.08f).alpha(0.75f).setDuration(120).start()
-                tile.bringToFront()
-                // Rung nhẹ báo hiệu bắt đầu drag
-                try {
-                    val vib = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                    @Suppress("DEPRECATION")
-                    if (android.os.Build.VERSION.SDK_INT >= 26)
-                        vib.vibrate(android.os.VibrationEffect.createOneShot(30, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
-                    else
-                        vib.vibrate(30)
-                } catch (e: Exception) { }
-            }
-        }
-
-        tile.setOnTouchListener { v, event ->
-            when (event.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    downRawX = event.rawX
-                    downRawY = event.rawY
-                    longPressTriggered = false
-                    isDragging = false
-                    handler.postDelayed(longPressRunnable, 1500)
-                    // Phải trả TRUE để nhận ACTION_MOVE tiếp theo
-                    true
-                }
-
-                android.view.MotionEvent.ACTION_MOVE -> {
-                    val dx = event.rawX - downRawX
-                    val dy = event.rawY - downRawY
-                    if (isDragging) {
-                        // Chặn ScrollView cha không nuốt event khi đang drag
-                        v.parent?.requestDisallowInterceptTouchEvent(true)
-                        // Di chuyển tile theo ngón tay
-                        v.x = startTileX + dx
-                        v.y = startTileY + dy
-                        highlightDropZone(v, gridContainer, cellPitchPx)
-                        true
-                    } else {
-                        // Chưa drag: nếu di chuyển >8dp thì huỷ long press, nhường cho ScrollView
-                        if (Math.abs(dx) > dp(8) || Math.abs(dy) > dp(8)) {
-                            handler.removeCallbacks(longPressRunnable)
-                            v.parent?.requestDisallowInterceptTouchEvent(false)
-                        }
-                        false
-                    }
-                }
-
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    handler.removeCallbacks(longPressRunnable)
-                    v.parent?.requestDisallowInterceptTouchEvent(false)
-                    if (isDragging) {
-                        isDragging = false
-                        longPressTriggered = false
-                        // Tính ô grid mà tile đang thả vào (trung tâm tile)
-                        val tileCenterX = v.x + v.width / 2f
-                        val tileCenterY = v.y + v.height / 2f
-                        val dropCol = (tileCenterX / cellPitchPx).toInt().coerceIn(0, 2)
-                        val dropRow = (tileCenterY / cellPitchPx).toInt().coerceAtLeast(0)
-
-                        // Tìm tile nào đang ở ô đó
-                        var targetTile: View? = null
-                        var targetPkg: String? = null
-                        for (i in 0 until gridContainer.childCount) {
-                            val child = gridContainer.getChildAt(i)
-                            if (child === v) continue
-                            val clp = child.layoutParams as? FrameLayout.LayoutParams ?: continue
-                            val childCol = (clp.leftMargin / cellPitchPx)
-                            val childRow = (clp.topMargin / cellPitchPx)
-                            if (childCol == dropCol && childRow == dropRow) {
-                                targetTile = child
-                                targetPkg = child.tag as? String
-                                break
-                            }
-                        }
-
-                        val lp = v.layoutParams as FrameLayout.LayoutParams
-
-                        if (targetTile != null && targetPkg != null) {
-                            // Ô đã có tile → KHÔNG cho đẩy → về chỗ cũ
-                            v.animate().x(origLeft.toFloat()).y(origTop.toFloat())
-                                .scaleX(1f).scaleY(1f).alpha(1f).setDuration(200).start()
-                        } else {
-                            // Ô trống → SWAP vị trí trong layout + lưu thứ tự
-                            val newLeft = dropCol * cellPitchPx + dp(2)
-                            val newTop = dropRow * cellPitchPx + dp(2)
-                            // Snap tile vào đúng ô grid
-                            v.animate().x(newLeft.toFloat()).y(newTop.toFloat())
-                                .scaleX(1f).scaleY(1f).alpha(1f).setDuration(150)
-                                .withEndAction {
-                                    lp.leftMargin = newLeft
-                                    lp.topMargin = newTop
-                                    v.layoutParams = lp
-                                    v.x = newLeft.toFloat()
-                                    v.y = newTop.toFloat()
-                                    // Cập nhật thứ tự trong userKeys theo vị trí y (trên→dưới)
-                                    reorderUserKeysByPosition(userKeys, gridContainer)
-                                    PinnedOrderStore.saveUserOrder(context, userKeys)
-                                }.start()
-                        }
-                        // Bỏ highlight
-                        clearDropZoneHighlight(gridContainer)
-                        true
-                    } else {
-                        false
-                    }
-                }
-                else -> false
-            }
-        }
-    }
-
-    /** Highlight nhẹ ô grid mà tile đang hover lên (viền trắng nhấp nháy). */
-    private fun highlightDropZone(dragging: View, gridContainer: FrameLayout, cellPitchPx: Int) {
-        val cx = dragging.x + dragging.width / 2f
-        val cy = dragging.y + dragging.height / 2f
-        val col = (cx / cellPitchPx).toInt().coerceIn(0, 2)
-        val row = (cy / cellPitchPx).toInt().coerceAtLeast(0)
-        for (i in 0 until gridContainer.childCount) {
-            val child = gridContainer.getChildAt(i)
-            if (child === dragging) continue
-            val clp = child.layoutParams as? FrameLayout.LayoutParams ?: continue
-            val childCol = clp.leftMargin / cellPitchPx
-            val childRow = clp.topMargin / cellPitchPx
-            child.alpha = if (childCol == col && childRow == row) 0.5f else 1f
-        }
-    }
-
-    private fun clearDropZoneHighlight(gridContainer: FrameLayout) {
-        for (i in 0 until gridContainer.childCount) {
-            gridContainer.getChildAt(i).alpha = 1f
-        }
-    }
-
-    /** Sắp xếp lại userKeys theo vị trí thực tế của tile trên lưới (trên→dưới, trái→phải). */
-    private fun reorderUserKeysByPosition(userKeys: MutableList<String>, gridContainer: FrameLayout) {
-        data class TilePos(val pkg: String, val left: Int, val top: Int)
-        val positions = mutableListOf<TilePos>()
-        for (i in 0 until gridContainer.childCount) {
-            val child = gridContainer.getChildAt(i)
-            val pkg = child.tag as? String ?: continue
-            val lp = child.layoutParams as? FrameLayout.LayoutParams ?: continue
-            positions.add(TilePos(pkg, lp.leftMargin, lp.topMargin))
-        }
-        positions.sortWith(compareBy({ it.top }, { it.left }))
-        val newOrder = positions.map { it.pkg }
-        userKeys.clear()
-        userKeys.addAll(newOrder)
-    }
-
-        /** Chế độ đổi vị trí: tile đang giữ mờ đi, chạm vào tile khác → SWAP, chạm ngoài → huỷ. */
-    private fun enterDragMode(
-        dragTile: View, dragId: String, isFixed: Boolean,
-        fixedKeys: MutableList<String>, userKeys: MutableList<String>,
-        gridContainer: FrameLayout
-    ) {
-        dragTile.alpha = 0.35f
-        val overlay = FrameLayout(context).apply { setBackgroundColor(0x33000000); isClickable = true }
-        val hint = TextView(context).apply {
-            text = "Chạm vào tile muốn đổi chỗ"
-            textSize = 14f; setTextColor(Color.WHITE); gravity = android.view.Gravity.CENTER
-            setBackgroundColor(0xBB000000.toInt()); setPadding(dp(16), dp(8), dp(16), dp(8))
-        }
-        overlay.addView(hint, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = android.view.Gravity.CENTER })
-
-        fun cleanup() { dragTile.alpha = 1f; gridContainer.removeView(overlay) }
-
-        val count = gridContainer.childCount
-        for (i in 0 until count) {
-            val child = gridContainer.getChildAt(i)
-            if (child === dragTile || child === overlay) continue
-            val targetId = (child.tag as? String) ?: continue
-            child.setOnClickListener {
-                // SWAP trong danh sách
-                val fa = fixedKeys.indexOf(dragId); val fb = fixedKeys.indexOf(targetId)
-                val ua = userKeys.indexOf(dragId);  val ub = userKeys.indexOf(targetId)
-                when {
-                    fa >= 0 && fb >= 0 -> { fixedKeys[fa] = targetId; fixedKeys[fb] = dragId }
-                    ua >= 0 && ub >= 0 -> { userKeys[ua] = targetId; userKeys[ub] = dragId }
-                    fa >= 0 && ub >= 0 -> { fixedKeys[fa] = targetId; userKeys[ub] = dragId }
-                    ua >= 0 && fb >= 0 -> { userKeys[ua] = targetId; fixedKeys[fb] = dragId }
-                }
-                PinnedOrderStore.saveFixedOrder(context, fixedKeys)
-                PinnedOrderStore.saveUserOrder(context, userKeys)
-                cleanup(); refreshPages()
-            }
-        }
-        overlay.setOnClickListener { cleanup() }
-        gridContainer.addView(overlay, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-    }
 
         /** Menu bật lên khi NHẤN GIỮ 1 app (trong danh sách "ứng dụng" hoặc chính tile đã ghim trên
      *  "start") - 2 dòng: "Ghim/Bỏ ghim vào start" và "Đánh dấu/Bỏ đánh dấu sao", tự đổi nhãn
@@ -975,37 +690,9 @@ class HomeScreenManager(
         }
     }
 
-    /** Dấu "✕" nhỏ ở góc trên-trái 1 tile/icon (kiểu "chế độ chỉnh sửa" quen thuộc) - chạm vào
-     *  để LOẠI BỎ app đó khỏi trang hiện tại (bỏ ghim khỏi start / bỏ khỏi Điện thoại), NHANH
-     *  hơn hẳn so với phải mở menu rồi tìm đúng dòng chữ. Trả về chính view dấu ✕ để nơi gọi có
-     *  thể removeView() khi cần huỷ (nhấn ra ngoài, hoặc đã xong việc khác trong menu).
-     *  Đặt margin DƯƠNG (không âm) để dấu ✕ nằm gọn TRONG viền tile, tránh bị viền/ScrollView
-     *  cha cắt mất 1 phần nếu dùng margin âm (tràn ra ngoài bounds của tile). */
-    private fun addRemoveBadge(tile: FrameLayout, onRemove: () -> Unit): View {
-        val badge = TextView(context).apply {
-            text = "✕"
-            textSize = 12f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(0xFFE81123.toInt()) // đỏ - màu "xoá/cảnh báo" chuẩn trong bảng màu Windows
-            }
-            layoutParams = FrameLayout.LayoutParams(dp(22), dp(22)).also {
-                it.gravity = Gravity.TOP or Gravity.START
-                it.leftMargin = dp(4); it.topMargin = dp(4)
-            }
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { onRemove() }
-        }
-        tile.addView(badge)
-        return badge
-    }
-
     /** 1 nút icon ĐƠN GIẢN kiểu Android chuẩn (icon tròn + tên bên dưới, canh giữa) - dùng cho 4
      *  mục CỐ ĐỊNH (YouTube/Ẩn danh/Nhiều T.khoản/Quản lý tệp). KHÔNG tham gia hệ thống lưới
-     *  Live Tile ([GridPlacer]/[TileSizeStore]/[PinnedOrderStore]) như [buildLiveTile] trước đây
+     *  Live Tile ([GridPlacer]/[TileSizeStore]) như [buildLiveTile] trước đây
      *  nữa - không đổi kích cỡ, không kéo-thả đổi vị trí, không menu nhấn giữ (setOnLongClickListener
      *  KHÔNG được gắn) - CHỈ CHẠM để mở, thứ tự CỐ ĐỊNH luôn luôn, đúng y hệt cách 4 icon tắt
      *  (shortcut) cố định trên màn hình chính Android thật hoạt động. Vùng chạm cũng THU GỌN
@@ -1071,15 +758,14 @@ class HomeScreenManager(
     ): View {
         val tile = FrameLayout(context).apply {
             // KHÔNG còn viền/ô vuông ngoài - chỉ còn icon (ô màu nhỏ) + tên bên dưới, giống 1 icon
-            // app Android bình thường. Nhấn giữ để chọn/kéo-thả VẪN ăn ở BẤT KỲ đâu trong ô lưới
-            // (isLongClickable + onLongClickListener bên dưới không đổi gì) - nhưng bấm CHẠM một
-            // phát để mở app thì CHỈ ăn khi chạm đúng icon/tên (xem iconBg/labelView bên dưới).
+            // app Android bình thường. Nhấn giữ để mở menu ngữ cảnh (xem [showPinContextMenu]) VẪN
+            // ăn ở BẤT KỲ đâu trong ô lưới (isLongClickable + onLongClickListener bên dưới không
+            // đổi gì) - nhưng bấm CHẠM một phát để mở app thì CHỈ ăn khi chạm đúng icon/tên (xem
+            // iconBg/labelView bên dưới).
             isFocusable = true
             isLongClickable = true
         }
-        // applyWpTilePressAnim KHÔNG dùng cho buildAppTile vì attachDragToTile đã gắn
-        // onTouchListener riêng - 2 listener cùng 1 view sẽ conflict, chỉ cái sau có hiệu lực.
-
+        applyWpTilePressAnim(tile) // hiệu ứng "bóp nhẹ" khi chạm - tính năng kéo-thả đã bị gỡ bỏ
         // Ô nền màu BÊN TRONG chứa icon app thật - VUÔNG BO GÓC NHẸ, đồng bộ với
         // [buildSimpleAppIcon] (xem giải thích ở đó).
         val iconBg = FrameLayout(context).apply {
