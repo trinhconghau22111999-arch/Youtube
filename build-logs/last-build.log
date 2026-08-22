@@ -20,9 +20,9 @@ Daemon will be stopped at the end of the build
 > Task :app:packageDebugResources
 > Task :app:mergeDebugResources
 > Task :app:parseDebugLocalResources
+> Task :app:mapDebugSourceSetPaths
 > Task :app:checkDebugAarMetadata
 > Task :app:dataBindingGenBaseClassesDebug
-> Task :app:mapDebugSourceSetPaths
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
 > Task :app:processDebugMainManifest
@@ -30,24 +30,26 @@ Daemon will be stopped at the end of the build
 > Task :app:javaPreCompileDebug
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
+> Task :app:processDebugManifestForPackage
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
 > Task :app:desugarDebugFileDependencies
 > Task :app:compressDebugAssets
 > Task :app:mergeDebugStartupProfile
-> Task :app:processDebugManifestForPackage
-> Task :app:checkDebugDuplicateClasses
-> Task :app:processDebugResources
-> Task :app:mergeExtDexDebug
 > Task :app:mergeDebugJniLibFolders
-> Task :app:mergeLibDexDebug
+> Task :app:processDebugResources
+> Task :app:checkDebugDuplicateClasses
 > Task :app:mergeDebugNativeLibs
-> Task :app:validateSigningDebug
-> Task :app:writeDebugAppMetadata
-> Task :app:writeDebugSigningConfigVersions
+> Task :app:compileDebugKotlin
+> Task :app:mergeExtDexDebug
+> Task :app:mergeLibDexDebug
 
 > Task :app:stripDebugDebugSymbols
 Unable to strip the following libraries, packaging them as they are: libimage_processing_util_jni.so.
+
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
 
 > Task :app:compileDebugKotlin
 w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/AccountBrowserActivity.kt:449:22 'setter for saveFormData: Boolean' is deprecated. Deprecated in Java
@@ -69,8 +71,9 @@ w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/HomeS
 w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/HomeScreenManager.kt:297:41 Parameter 'userKeys' is never used
 w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/HomeScreenManager.kt:347:31 Unnecessary non-null assertion (!!) on a non-null receiver of type PopupWindow
 w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/HomeScreenManager.kt:361:9 Parameter 'pkgName' is never used
+w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/HomeScreenManager.kt:368:13 Variable 'longPressTriggered' is assigned but never accessed
 w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/HomeScreenManager.kt:393:80 'VIBRATOR_SERVICE: String' is deprecated. Deprecated in Java
-w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/HomeScreenManager.kt:534:41 Parameter 'isFixed' is never used
+w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/HomeScreenManager.kt:540:41 Parameter 'isFixed' is never used
 w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/IncognitoActivity.kt:283:22 'setter for saveFormData: Boolean' is deprecated. Deprecated in Java
 w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/IncognitoActivity.kt:603:18 This declaration overrides deprecated member but not marked as deprecated itself. Please add @Deprecated annotation or suppress. See https://youtrack.jetbrains.com/issue/KT-47902 for details
 w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/LockScreenActivity.kt:251:18 This declaration overrides deprecated member but not marked as deprecated itself. Please add @Deprecated annotation or suppress. See https://youtrack.jetbrains.com/issue/KT-47902 for details
@@ -104,7 +107,7 @@ w: file:///home/runner/work/Choi/Choi/app/src/main/java/com/phone/launcher/WpApp
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 1m 51s
+BUILD SUCCESSFUL in 1m 43s
 40 actionable tasks: 40 executed
 
 === APK thực tế tìm thấy sau build (find app/build/outputs -iname '*.apk') ===
