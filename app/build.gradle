@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.h.adblockbrowser'
+    namespace 'com.phone.launcher'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.h.adblockbrowser"
+        applicationId "com.phone.launcher"
         minSdk 24
         targetSdk 34
         // QUAN TRỌNG: versionCode PHẢI tăng dần mỗi lần build, nếu không Android sẽ coi "bản
