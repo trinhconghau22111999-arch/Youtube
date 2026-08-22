@@ -408,28 +408,34 @@ class HomeScreenManager(
                     longPressTriggered = false
                     isDragging = false
                     handler.postDelayed(longPressRunnable, 1500)
-                    false // không nuốt - cho click vẫn hoạt động
+                    // Phải trả TRUE để nhận ACTION_MOVE tiếp theo
+                    true
                 }
 
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - downRawX
                     val dy = event.rawY - downRawY
-                    // Huỷ long press nếu ngón tay di chuyển quá 10dp trước khi hết 1.5s
-                    if (!longPressTriggered && (Math.abs(dx) > dp(10) || Math.abs(dy) > dp(10))) {
-                        handler.removeCallbacks(longPressRunnable)
-                    }
                     if (isDragging) {
+                        // Chặn ScrollView cha không nuốt event khi đang drag
+                        v.parent?.requestDisallowInterceptTouchEvent(true)
                         // Di chuyển tile theo ngón tay
                         v.x = startTileX + dx
                         v.y = startTileY + dy
-                        // Highlight ô đang hover
                         highlightDropZone(v, gridContainer, cellPitchPx)
                         true
-                    } else false
+                    } else {
+                        // Chưa drag: nếu di chuyển >8dp thì huỷ long press, nhường cho ScrollView
+                        if (Math.abs(dx) > dp(8) || Math.abs(dy) > dp(8)) {
+                            handler.removeCallbacks(longPressRunnable)
+                            v.parent?.requestDisallowInterceptTouchEvent(false)
+                        }
+                        false
+                    }
                 }
 
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                     handler.removeCallbacks(longPressRunnable)
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
                     if (isDragging) {
                         isDragging = false
                         longPressTriggered = false
@@ -1071,7 +1077,8 @@ class HomeScreenManager(
             isFocusable = true
             isLongClickable = true
         }
-        applyWpTilePressAnim(tile)
+        // applyWpTilePressAnim KHÔNG dùng cho buildAppTile vì attachDragToTile đã gắn
+        // onTouchListener riêng - 2 listener cùng 1 view sẽ conflict, chỉ cái sau có hiệu lực.
 
         // Ô nền màu BÊN TRONG chứa icon app thật - VUÔNG BO GÓC NHẸ, đồng bộ với
         // [buildSimpleAppIcon] (xem giải thích ở đó).
