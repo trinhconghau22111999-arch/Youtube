@@ -29,15 +29,7 @@
 
     </FrameLayout>
 
-    <!-- Nút toggle desktop/mobile - ẩn, chuyển vào menu đa nhiệm -->
-    <ImageButton
-        android:id="@+id/btnDesktopSite"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        android:src="@drawable/ic_mobile_mode"
-        android:background="@null"
-        android:contentDescription="Chuyển bản máy tính / di động" />
+    <!-- ĐÃ XOÁ HẲN: nút toggle desktop/mobile (User-Agent tuỳ chỉnh) theo yêu cầu. -->
 
     <!-- Thanh địa chỉ cố định dưới cùng - CHỈ hiện khi đang xem trang web, ẩn ở trang chủ vì
          trang chủ không phải trang web nên không cần nhập địa chỉ. -->

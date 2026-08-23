@@ -21,7 +21,7 @@ import android.widget.TextView
 /**
  * Màn hình "đã gắn dấu" (star) - dựng THEO ĐÚNG bố cục lưới "Live Tile" 3 cột giống HỆT trang
  * "start" (xem HomeScreenManager.buildStartPage): mỗi trang web đã gắn dấu hiện thành 1 ô vuông
- * phẳng, màu accent xoay vòng đúng bảng màu Live Tile (ThemePrefs.PALETTE), icon ngôi sao trắng
+ * phẳng, màu accent xoay vòng đúng bảng màu Live Tile (bảng màu cố định), icon ngôi sao trắng
  * góc trên-trái, nhãn là tên miền rút gọn của URL ở góc dưới-trái - cùng kiểu chữ/kích thước
  * dùng chung với tile trên "start" để 2 trang có cảm giác ĐỒNG BỘ tuyệt đối.
  *
@@ -88,7 +88,15 @@ object StarredView {
         onRemove: (String) -> Unit
     ): Handle {
         fun dp(v: Int) = (v * activity.resources.displayMetrics.density).toInt()
-        val tilePalette = ThemePrefs.PALETTE
+        // Bảng màu cố định (trước đây lấy từ ThemePrefs.PALETTE - đã gỡ tính năng đổi màu giao
+        // diện) để xoay vòng tô màu các ô "đã đánh dấu sao", giữ đúng 20 màu Live Tile gốc WP.
+        val tilePalette = intArrayOf(
+            0xFFA4C400.toInt(), 0xFF60A917.toInt(), 0xFF008A00.toInt(), 0xFF00ABA9.toInt(),
+            0xFF1BA1E2.toInt(), 0xFF0078D7.toInt(), 0xFF6A00FF.toInt(), 0xFFAA00FF.toInt(),
+            0xFFF472D0.toInt(), 0xFFD80073.toInt(), 0xFFA20025.toInt(), 0xFFE51400.toInt(),
+            0xFFFA6800.toInt(), 0xFFF0A30A.toInt(), 0xFFE3C800.toInt(), 0xFF825A2C.toInt(),
+            0xFF6D8764.toInt(), 0xFF647687.toInt(), 0xFF76608A.toInt(), 0xFF87794E.toInt()
+        )
 
         val overlay = FrameLayout(activity).apply {
             setBackgroundColor(0xFF000000.toInt())

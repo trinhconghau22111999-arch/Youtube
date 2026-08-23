@@ -148,11 +148,11 @@ class IncognitoActivity : AppCompatActivity() {
         urlRow.addView(TextView(this).apply {
             text = "Đã gắn dấu"
             textSize = 12f
-            setTextColor(ThemePrefs.accent(this@IncognitoActivity))
+            setTextColor(0xFF0078D7.toInt())
             setPadding(dp(8), dp(6), dp(4), dp(6))
             // Icon sao dạng vector thay cho ký tự "★", đặt bên trái chữ, cùng màu accent.
             val star = ContextCompat.getDrawable(this@IncognitoActivity, R.drawable.ic_wp_star_filled)
-            star?.setTintList(ColorStateList.valueOf(ThemePrefs.accent(this@IncognitoActivity)))
+            star?.setTintList(ColorStateList.valueOf(0xFF0078D7.toInt()))
             star?.setBounds(0, 0, dp(16), dp(16))
             setCompoundDrawables(star, null, null, null)
             compoundDrawablePadding = dp(4)
@@ -163,7 +163,7 @@ class IncognitoActivity : AppCompatActivity() {
 
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
-            progressTintList = android.content.res.ColorStateList.valueOf(ThemePrefs.accent(this@IncognitoActivity))
+            progressTintList = android.content.res.ColorStateList.valueOf(0xFF0078D7.toInt())
             visibility = View.GONE
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(3))
         }
@@ -278,7 +278,8 @@ class IncognitoActivity : AppCompatActivity() {
             settings.setSupportZoom(true)
             settings.builtInZoomControls = true
             settings.displayZoomControls = false
-            settings.userAgentString = UserAgentManager.MOBILE_UA
+            // ĐÃ XOÁ HẲN: UA di động tuỳ chỉnh (UserAgentManager) theo yêu cầu - dùng UA MẶC ĐỊNH
+            // của hệ thống WebView.
             // Ẩn danh: không lưu mật khẩu/form đã điền, không cho tự động điền lại
             settings.saveFormData = false
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -434,7 +435,6 @@ class IncognitoActivity : AppCompatActivity() {
                 view?.clearHistory()
                 view?.evaluateJavascript(ZoomEnabler.JS, null)
                 view?.evaluateJavascript(AdOverlayBlocker.JS, null)
-                view?.evaluateJavascript(TranslateInjector.JS, null)
                 if (YoutubeAdSkipper.isYoutube(url)) view?.evaluateJavascript(YoutubeAdSkipper.JS, null)
                 saveSession()
             }
@@ -499,7 +499,7 @@ class IncognitoActivity : AppCompatActivity() {
             cell.addView(TextView(this).apply {
                 text = tab.title
                 textSize = 12f
-                setTextColor(if (i == activeIndex) ThemePrefs.accent(this@IncognitoActivity) else 0xFFAAAAAA.toInt())
+                setTextColor(if (i == activeIndex) 0xFF0078D7.toInt() else 0xFFAAAAAA.toInt())
             })
             cell.addView(ImageView(this).apply {
                 setImageResource(R.drawable.ic_wp_close)
@@ -516,7 +516,7 @@ class IncognitoActivity : AppCompatActivity() {
         tabBar.addView(TextView(this).apply {
             text = "+ Tab"
             textSize = 13f
-            setTextColor(ThemePrefs.accent(this@IncognitoActivity))
+            setTextColor(0xFF0078D7.toInt())
             setPadding(dp(12), dp(8), dp(12), dp(8))
             isClickable = true
             setOnClickListener { newTab("about:blank") }

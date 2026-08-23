@@ -130,7 +130,7 @@ object TaskView {
                     textSize = 15f
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
-                    setTextColor(if (i == currentActive) ThemePrefs.accent(activity) else Color.WHITE)
+                    setTextColor(if (i == currentActive) 0xFF0078D7.toInt() else Color.WHITE)
                 })
                 texts.addView(TextView(activity).apply {
                     text = item.url

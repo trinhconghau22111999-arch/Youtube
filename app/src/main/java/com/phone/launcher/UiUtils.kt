@@ -110,7 +110,7 @@ fun Activity.buildWpToggle(initialChecked: Boolean, onToggle: (Boolean) -> Unit)
     }
     fun applyTrackColor() {
         if (checked) {
-            trackBg.setColor(ThemePrefs.accent(this))
+            trackBg.setColor(0xFF0078D7.toInt())
             trackBg.setStroke(0, Color.TRANSPARENT)
         } else {
             trackBg.setColor(Color.TRANSPARENT)

@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity() {
             setColor(android.graphics.Color.BLACK)
         }
         val underline = android.graphics.drawable.GradientDrawable().apply {
-            setColor(ThemePrefs.accent(this@MainActivity))
+            setColor(0xFF0078D7.toInt())
         }
         return android.graphics.drawable.LayerDrawable(arrayOf(bg, underline)).apply {
             setLayerGravity(1, Gravity.BOTTOM)
@@ -125,7 +125,6 @@ class MainActivity : AppCompatActivity() {
     private var programmaticLoad = false
 
     // Bấm nút "🖥 Bản máy tính" nổi -> ép trang HIỆN TẠI sang UA máy tính tới khi tắt lại.
-    private var forceDesktop = false
 
     // ĐÃ BỎ (theo yêu cầu): tính năng "cửa sổ nổi trong app" (mini-player WebView riêng tự动
     // mở khi xem YouTube) - gây lỗi bàn phím ảo không bật lên được (WebView nổi tự cướp focus)
@@ -133,14 +132,8 @@ class MainActivity : AppCompatActivity() {
     // tiếp vì tính năng "phát nền thật" khi thoát hẳn app (bấm Home vật lý) vốn không làm được
     // bằng WebView (xem giải thích trong hội thoại) - giữ app đơn giản, ổn định hơn.
     private var floatingBackButtonHandle: WpNavBar.Handle? = null
-    // ĐÃ XOÁ HẲN: Thanh App Bar kiểu WP (dãy nền đen chứa icon Tải lại / Bản máy tính-di động /
-    // Chia sẻ + nút "..." mở rộng) theo yêu cầu - xem WpAppBar.kt (không còn được dùng nữa).
+    // ĐÃ XOÁ HẲN: Thanh App Bar kiểu WP, nút "Off" giả tắt màn hình (FakeScreenOff) theo yêu cầu.
 
-    // Nút "Off" nổi thứ 2, cùng kiểu nút tròn nổi kéo-thả với nút Back (xem FloatingBackButton),
-    // nhưng bấm vào sẽ phủ màn hình "giả tắt" (FakeScreenOff) thay vì lùi trang - dùng khi đang
-    // xem video (Youtube...) muốn "tắt màn hình" tạm thời (video/nhạc vẫn phát, chỉ chặn chạm
-    // nhầm) mà không phải tắt màn hình thật của máy (tắt thật thì Youtube tự dừng video).
-    private var floatingOffButtonHandle: FloatingBackButton.Handle? = null
 
     // Video/trang toàn màn hình HTML5 (xem onShowCustomView/onHideCustomView) - dùng chung với
     // logic chia 3 màn hình: khi đang ngang, customView (nếu có) sẽ là ô đầu tiên của chia 3
@@ -152,7 +145,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val REQ_PERMISSIONS = 101
-        const val REQ_LOCK = 103
         const val DOWNLOAD_FOLDER = "AdBlockBrowser"
     }
 
@@ -169,13 +161,9 @@ class MainActivity : AppCompatActivity() {
         }
         enableImmersiveMode()
 
-        // Khoá ứng dụng (PIN/Hình, đặt ở Cài đặt) - nếu đang bật, bắt buộc mở khoá đúng mới cho
-        // vào màn chính. LockScreenActivity không cho back thoát ra (chỉ đưa app xuống nền).
-        if (AppLockPrefs.isEnabled(this)) {
-            startActivityForResult(Intent(this, LockScreenActivity::class.java), REQ_LOCK)
-        } else {
-            initAfterUnlock()
-        }
+        // Khoá ứng dụng (PIN/Hình) đã được GỠ BỎ theo yêu cầu - vào thẳng màn chính, không cần
+        // mở khoá gì cả.
+        initAfterUnlock()
     }
 
     private fun initAfterUnlock() {
@@ -198,7 +186,7 @@ class MainActivity : AppCompatActivity() {
         // nhấn người dùng vừa chọn ở Cài đặt, không cần build lại app.
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
-            progressTintList = android.content.res.ColorStateList.valueOf(ThemePrefs.accent(this@MainActivity))
+            progressTintList = android.content.res.ColorStateList.valueOf(0xFF0078D7.toInt())
             progressBackgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.BLACK)
             visibility = View.GONE
         }
@@ -229,8 +217,6 @@ class MainActivity : AppCompatActivity() {
         )
         addFloatingBackHomeButtons()
         loadWallpaper()
-
-        findViewById<android.widget.ImageButton>(R.id.btnDesktopSite).setOnClickListener { toggleDesktopSite() }
 
         edtUrl.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_GO ||
@@ -274,7 +260,6 @@ class MainActivity : AppCompatActivity() {
         // Đọc lại vị trí nút Back nổi mới nhất (có thể vừa bị kéo sang chỗ khác ở màn hình
         // khác trong lúc màn hình này ở nền) - xem giải thích đồng bộ ở FloatingBackButton.kt.
         floatingBackButtonHandle?.resync()
-        floatingOffButtonHandle?.resync()
     }
 
     private fun loadWallpaper() {
@@ -297,7 +282,6 @@ class MainActivity : AppCompatActivity() {
         toolbarUrl.visibility = View.GONE
         progressBar?.visibility = View.GONE
         pauseAllVideos()
-        floatingOffButtonHandle?.setVisible(false)
         homeScreenManager.goToStart()
     }
 
@@ -343,21 +327,8 @@ class MainActivity : AppCompatActivity() {
         navigateTo(input)
     }
 
-    private fun toggleDesktopSite() {
-        forceDesktop = !forceDesktop
-        val btn = findViewById<android.widget.ImageButton>(R.id.btnDesktopSite)
-        btn.setImageResource(
-            if (forceDesktop) R.drawable.ic_desktop_mode else R.drawable.ic_mobile_mode
-        )
-        Toast.makeText(
-            this,
-            if (forceDesktop) "Đã chuyển sang bản máy tính" else "Đã chuyển về bản di động",
-            Toast.LENGTH_SHORT
-        ).show()
-        webView.url?.let { navigateTo(it) }
-        // ĐÃ BỎ App Bar kiểu WP (thanh đen chứa Tải lại / Bản máy tính-di động / Chia sẻ / "...")
-        // theo yêu cầu - không dựng lại nữa, icon đổi trạng thái vẫn nằm ở btnDesktopSite riêng.
-    }
+    // ĐÃ XOÁ HẲN: chuyển đổi bản máy tính/di động (User-Agent tuỳ chỉnh) theo yêu cầu - WebView
+    // giờ luôn dùng User-Agent MẶC ĐỊNH của hệ thống, không còn ép UA riêng cho bất kỳ trang nào.
 
     /** Chia sẻ địa chỉ trang đang xem qua app khác (Zalo, Messenger, email...) bằng hộp thoại
      *  chia sẻ HỆ THỐNG - hộp thoại này KHÔNG thuộc app nên để hệ thống tự vẽ theo ROM máy, không
@@ -384,39 +355,25 @@ class MainActivity : AppCompatActivity() {
 
     // ---------- Quyền ----------
 
+    // ĐÃ XOÁ: xin quyền truy cập TOÀN BỘ tệp (MANAGE_EXTERNAL_STORAGE) - quyền này chỉ từng
+    // phục vụ Quản lý tệp (FilesActivity, đã gỡ bỏ), không còn màn hình nào trong app cần đọc
+    // duyệt file/thư viện media của máy nữa - Tải video (DownloadManager) không cần quyền này.
     private fun requestAllPermissions() {
-        // Android 11+: xin quyền truy cập toàn bộ tệp (MANAGE_EXTERNAL_STORAGE)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!android.os.Environment.isExternalStorageManager()) {
-                try {
-                    val intent = android.content.Intent(
-                        android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                        android.net.Uri.parse("package:$packageName")
-                    )
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    startActivity(android.content.Intent(
-                        android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
-                    ))
-                }
-            }
-        }
-
         val perms = ArrayList<String>()
+        // Camera/Micro/Vị trí: KHÔNG phải app tự dùng - đây là quyền HỆ THỐNG mà trang web đang
+        // xem (trong WebView) có thể xin (gọi video, bản đồ...), xem onPermissionRequest() và
+        // onGeolocationPermissionsShowPrompt() bên dưới.
         perms.add(Manifest.permission.CAMERA)
         perms.add(Manifest.permission.RECORD_AUDIO)
         perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
         perms.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         if (Build.VERSION.SDK_INT >= 33) {
-            perms.add(Manifest.permission.READ_MEDIA_IMAGES)
-            perms.add(Manifest.permission.READ_MEDIA_VIDEO)
-            perms.add(Manifest.permission.READ_MEDIA_AUDIO)
+            // Thông báo "đã tải xong" của DownloadManager khi tải video.
             perms.add(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            perms.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            if (Build.VERSION.SDK_INT < 29) {
-                perms.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            }
+        } else if (Build.VERSION.SDK_INT < 29) {
+            // Android cũ (<10): DownloadManager cần quyền ghi vào bộ nhớ ngoài để lưu video tải
+            // về thư mục Movies (xem downloadVideo()) - Android 10+ không cần quyền này nữa.
+            perms.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
         val need = perms.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -429,11 +386,6 @@ class MainActivity : AppCompatActivity() {
     // ---------- Điều hướng ----------
 
     private fun navigateTo(url: String) {
-        // Đặt User-Agent ĐÚNG cho từng trang TRƯỚC khi tải (Zalo luôn máy tính, nút nổi "🖥ản máy
-        // tính" ép toàn bộ, còn lại dùng UA di động "sạch" - xem UserAgentManager.kt để biết vì
-        // sao việc này giúp Gmail hiện đúng bản đầy đủ/cá nhân thay vì bản HTML rút gọn).
-        val uri = try { Uri.parse(url) } catch (e: Exception) { null }
-        webView.settings.userAgentString = UserAgentManager.uaFor(uri?.host, forceDesktop, uri?.path)
         hideHomeOverlay()
         programmaticLoad = true
         webView.loadUrl(url)
@@ -470,14 +422,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_LOCK) {
-            if (resultCode == RESULT_OK) {
-                initAfterUnlock()
-            }
-            // resultCode khác OK (bị đưa xuống nền qua nút back của LockScreenActivity) -
-            // không làm gì cả, app vẫn ở màn khoá lúc quay lại foreground lần sau.
-            return
-        }
     }
 
     private fun openShortcutByKey(key: String) {
@@ -493,8 +437,6 @@ class MainActivity : AppCompatActivity() {
             val initialUrl = parts.getOrNull(1)
             val activityClass = when (activityName) {
                 "IncognitoActivity" -> IncognitoActivity::class.java
-                "AccountsActivity" -> AccountsActivity::class.java
-                "FilesActivity" -> FilesActivity::class.java
                 else -> null
             }
             if (activityClass != null) {
@@ -785,7 +727,6 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 edtUrl.setText(url)
-                updateOffButtonVisibility(url)
                 view?.evaluateJavascript(AdOverlayBlocker.JS, null)
                 if (YoutubeAdSkipper.isYoutube(url)) {
                     // AdOverlayBlocker KHÔNG chạy trên YouTube - nó dùng querySelectorAll('body *')
@@ -798,9 +739,6 @@ class MainActivity : AppCompatActivity() {
                     // giải thích ở VideoDownloadUI), chỉ án ngữ giao diện vô ích. Các trang khác
                     // có video link file trực tiếp (mp4/webm...) vẫn hiện nút bình thường.
                     view?.evaluateJavascript(VideoDownloadUI.JS, null)
-                }
-                if (ZaloDesktopStyler.isZalo(try { Uri.parse(url).host } catch (e: Exception) { null })) {
-                    view?.evaluateJavascript(ZaloDesktopStyler.JS, null)
                 }
             }
         }
@@ -991,54 +929,13 @@ class MainActivity : AppCompatActivity() {
             }
         )
 
-        // ĐÃ XOÁ HẲN App Bar kiểu WP (dãy nền đen chứa icon Tải lại/Bản máy tính-di động/
-        // Chia sẻ + nút "...") theo yêu cầu - không còn dựng/hiện lại nữa.
-
-        // Nút "Off" nổi - bấm để phủ màn hình giả tắt (xem FakeScreenOff). Icon "⏻" (nút nguồn)
-        // để phân biệt rõ với mũi tên "◁" của nút Back.
-        //
-        // fixed = false: nút NỔI và KÉO-THẢ được tự do như nút Back (không còn cố định 1 chỗ ở
-        // góc dưới-trái nữa) - kéo đi đâu tuỳ ý, thả tay tự "hít" vào cạnh trái/phải gần nhất,
-        // vị trí được nhớ riêng (key theo id "off", không đụng vị trí đã lưu của nút Back) và
-        // đồng bộ giữa các màn hình như nút Back. defaultYFraction = 0.7f (khác 0.5f mặc định
-        // của nút Back) để lần đầu xuất hiện 2 nút không chồng lên nhau.
-        //
-        // CHỈ HIỆN KHI ĐANG Ở TRANG YOUTUBE: nút này dùng để giả tắt màn hình lúc nghe video/
-        // nhạc YouTube chạy nền, không có ý nghĩa gì ở các trang khác -> ẩn đi (setVisible(false)
-        // ngay sau khi attach) để đỡ chiếm chỗ/gây rối màn hình chính và các trang web khác.
-        // updateOffButtonVisibility() (gọi ở onPageFinished) sẽ tự hiện lại đúng lúc vào YouTube.
-        //
-        // doubleTapOnly = false: chỉ cần CHẠM 1 LẦN là kích hoạt ngay (không cần double-tap như
-        // nút Back) - vì nút Off chỉ hiện đúng lúc đang ở YouTube nên ít nguy cơ chạm nhầm hơn.
-        floatingOffButtonHandle = FloatingBackButton.attach(
-            activity = this,
-            root = root,
-            // Truyền [webView] để FakeScreenOff tự hạ chất lượng video xuống thấp nhất lúc bật
-            // (tiết kiệm CPU/GPU giải mã -> đỡ pin hơn khi không ai nhìn hình), và tự phục hồi
-            // đúng chất lượng cũ lúc tắt lớp phủ - xem giải thích chi tiết ở FakeScreenOff.kt.
-            onTap = { FakeScreenOff.show(this, webView) },
-            id = "off",
-            icon = "⏻",
-            defaultIsRight = false,
-            defaultYFraction = 0.7f,
-            fixed = false,
-            doubleTapOnly = false
-        )
-        floatingOffButtonHandle?.setVisible(false)
-    }
-
-    /** Hiện nút "Off" giả tắt màn hình CHỈ khi đang ở trang YouTube, ẩn đi ở mọi trang khác.
-     *  Gọi mỗi khi trang tải xong (onPageFinished) để luôn khớp đúng trang hiện tại. */
-    private fun updateOffButtonVisibility(url: String?) {
-        floatingOffButtonHandle?.setVisible(YoutubeAdSkipper.isYoutube(url))
+        // ĐÃ XOÁ HẲN App Bar kiểu WP, nút "Off" giả tắt màn hình (FakeScreenOff) theo yêu cầu.
     }
 
     // Thoát app -> xoá sạch mọi dấu vết phiên làm việc
     override fun onDestroy() {
         clearAllSessionData()
         floatingBackButtonHandle?.detach()
-        floatingOffButtonHandle?.detach()
-        FakeScreenOff.hide()
         super.onDestroy()
     }
 }
