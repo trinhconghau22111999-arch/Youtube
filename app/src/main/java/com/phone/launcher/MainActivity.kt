@@ -35,7 +35,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -143,7 +142,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fullscreenContainer: FrameLayout
 
     companion object {
-        const val REQ_PERMISSIONS = 101
         const val DOWNLOAD_FOLDER = "AdBlockBrowser"
     }
 
@@ -206,7 +204,11 @@ class MainActivity : AppCompatActivity() {
         val homeContainer = homeOverlay as android.widget.FrameLayout
         homeContainer.addView(homeScreenManager.build())
 
-        requestAllPermissions()
+        // ĐÃ BỎ xin quyền (camera/mic/vị trí...) ngay lúc mở app - không còn hộp thoại xin quyền
+        // nào bật lên khi vừa vào app nữa. Các quyền này giờ CHỈ có tác dụng nếu người dùng tự
+        // vào Cài đặt máy > Ứng dụng > cấp tay; nếu chưa cấp, trang web nào xin camera/mic/vị
+        // trí sẽ tự bị từ chối lặng lẽ (xem onPermissionRequest/onGeolocationPermissionsShowPrompt
+        // bên dưới - đã có sẵn logic kiểm tra quyền hệ thống trước khi cấp cho trang web).
         setupWebView()
         fullscreenContainer = FrameLayout(this).apply { visibility = View.GONE }
         findViewById<FrameLayout>(R.id.rootFrame).addView(
@@ -334,35 +336,8 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Đã xoá dữ liệu duyệt web", Toast.LENGTH_SHORT).show()
     }
 
-    // ---------- Quyền ----------
-
-    // ĐÃ XOÁ: xin quyền truy cập TOÀN BỘ tệp (MANAGE_EXTERNAL_STORAGE) - quyền này chỉ từng
-    // phục vụ Quản lý tệp (FilesActivity, đã gỡ bỏ), không còn màn hình nào trong app cần đọc
-    // duyệt file/thư viện media của máy nữa - Tải video (DownloadManager) không cần quyền này.
-    private fun requestAllPermissions() {
-        val perms = ArrayList<String>()
-        // Camera/Micro/Vị trí: KHÔNG phải app tự dùng - đây là quyền HỆ THỐNG mà trang web đang
-        // xem (trong WebView) có thể xin (gọi video, bản đồ...), xem onPermissionRequest() và
-        // onGeolocationPermissionsShowPrompt() bên dưới.
-        perms.add(Manifest.permission.CAMERA)
-        perms.add(Manifest.permission.RECORD_AUDIO)
-        perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        perms.add(Manifest.permission.ACCESS_COARSE_LOCATION)
-        if (Build.VERSION.SDK_INT >= 33) {
-            // Thông báo "đã tải xong" của DownloadManager khi tải video.
-            perms.add(Manifest.permission.POST_NOTIFICATIONS)
-        } else if (Build.VERSION.SDK_INT < 29) {
-            // Android cũ (<10): DownloadManager cần quyền ghi vào bộ nhớ ngoài để lưu video tải
-            // về thư mục Movies (xem downloadVideo()) - Android 10+ không cần quyền này nữa.
-            perms.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
-        val need = perms.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
-        if (need.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, need.toTypedArray(), REQ_PERMISSIONS)
-        }
-    }
+    // ĐÃ XOÁ HẲN: xin quyền (camera/mic/vị trí/thông báo...) ngay lúc mở app - không còn hộp
+    // thoại xin quyền nào bật lên khi vừa vào app nữa (xem giải thích ở onCreate()).
 
     // ---------- Điều hướng ----------
 
@@ -571,8 +546,8 @@ class MainActivity : AppCompatActivity() {
 
             // Tự cấp quyền VỊ TRÍ THẬT cho trang web (Google Maps...) khi trang yêu cầu qua
             // navigator.geolocation - chỉ cấp nếu bản thân app ĐÃ được cấp quyền vị trí hệ thống
-            // (xin ở đầu app, xem requestAllPermissions()); nếu chưa có, từ chối an toàn thay vì
-            // để WebView tự treo hộp thoại mà không có quyền hệ thống đứng sau.
+            // (người dùng tự vào Cài đặt máy cấp tay - app KHÔNG còn tự xin lúc mở app nữa); nếu
+            // chưa có, từ chối an toàn thay vì để WebView tự treo hộp thoại không có quyền đứng sau.
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?, callback: android.webkit.GeolocationPermissions.Callback?
             ) {
