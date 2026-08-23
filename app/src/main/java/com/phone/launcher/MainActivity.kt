@@ -35,6 +35,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -118,6 +119,14 @@ class MainActivity : AppCompatActivity() {
     private var edtHomeSearch: EditText? = null
     private lateinit var homeScreenManager: HomeScreenManager
 
+    // Giữ TẠM yêu cầu quyền của trang web (camera/mic hoặc vị trí) trong lúc chờ người dùng trả
+    // lời hộp thoại xin quyền HỆ THỐNG vừa bật lên (xem onPermissionRequest/
+    // onGeolocationPermissionsShowPrompt bên dưới và onRequestPermissionsResult) - KHÔNG xin
+    // quyền sẵn lúc mở app nữa, chỉ xin ĐÚNG LÚC trang web thực sự cần.
+    private var pendingWebPermissionRequest: PermissionRequest? = null
+    private var pendingGeoOrigin: String? = null
+    private var pendingGeoCallback: android.webkit.GeolocationPermissions.Callback? = null
+
     // Đánh dấu điều hướng do chính app gọi (từ thanh địa chỉ / menu đề xuất / mở lại tab)
     // để KHÔNG hỏi xác nhận, chỉ hỏi khi người dùng bấm link ngay trên trang.
     private var programmaticLoad = false
@@ -142,6 +151,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fullscreenContainer: FrameLayout
 
     companion object {
+        const val REQ_PERMISSIONS = 101
         const val DOWNLOAD_FOLDER = "AdBlockBrowser"
     }
 
@@ -380,6 +390,45 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
     }
 
+    // Kết quả hộp thoại xin quyền HỆ THỐNG vừa bật lên ĐÚNG LÚC trang web cần (camera/mic/vị
+    // trí) - xem onPermissionRequest/onGeolocationPermissionsShowPrompt ở setupWebView(). Đọc
+    // lại quyền THẬT sự đã được cấp (không tin thẳng mảng grantResults - có thể sai lệch nếu
+    // vượt quá 1 hộp thoại chồng nhau) rồi trả lời cho đúng callback đang chờ (nếu có).
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQ_PERMISSIONS) return
+
+        pendingWebPermissionRequest?.let { request ->
+            pendingWebPermissionRequest = null
+            val granted = request.resources.filter { resource ->
+                when (resource) {
+                    PermissionRequest.RESOURCE_AUDIO_CAPTURE ->
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                    PermissionRequest.RESOURCE_VIDEO_CAPTURE ->
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                    else -> true
+                }
+            }
+            if (granted.isNotEmpty()) request.grant(granted.toTypedArray()) else request.deny()
+            if (granted.size < request.resources.size) {
+                Toast.makeText(this, "Chưa cấp quyền micro/camera - trang web sẽ không dùng được tính năng này", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        if (pendingGeoCallback != null) {
+            val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            pendingGeoCallback?.invoke(pendingGeoOrigin, granted, false)
+            if (!granted) {
+                Toast.makeText(this, "Chưa cấp quyền vị trí - trang web sẽ không dùng được tính năng này", Toast.LENGTH_LONG).show()
+            }
+            pendingGeoCallback = null
+            pendingGeoOrigin = null
+        }
+    }
+
     private fun openShortcutByKey(key: String) {
         val item = ShortcutsRepository.ALL[key] ?: return
         if (item.type == ShortcutType.WEB) {
@@ -509,45 +558,34 @@ class MainActivity : AppCompatActivity() {
                 refreshLayoutMode()
             }
 
-            // FIX (lý do "bấm mở mic là tắt liền"): trước đây CẤP LUÔN mọi quyền WebView yêu
-            // cầu mà không kiểm tra quyền HỆ THỐNG (RECORD_AUDIO/CAMERA) có thực sự đã được
-            // người dùng đồng ý hay chưa - nếu người dùng từng bấm "Từ chối" ở hộp thoại xin
-            // quyền lúc mở app lần đầu (hoặc thu hồi quyền sau đó trong Cài đặt), WebView vẫn
-            // được báo "đã cấp" -> trang (YouTube tìm bằng giọng nói...) hiện UI ghi âm lên,
-            // nhưng phần cứng mic bị hệ điều hành CHẶN THẬT NGAY LẬP TỨC vì thiếu quyền hệ
-            // thống -> luồng ghi âm kết thúc tức khắc, nhìn như "bấm mở là tắt liền" dù giao
-            // diện tưởng đã được cấp quyền. Giờ CHỈ cấp đúng resource nào có quyền hệ thống
-            // tương ứng đã thực sự được cấp; thiếu quyền nào thì từ chối riêng resource đó và
-            // báo cho người dùng biết, thay vì cấp khống rồi để lỗi âm thầm khó hiểu.
+            // KHÔNG còn xin quyền sẵn lúc mở app - lúc trang web xin camera/mic, kiểm tra quyền
+            // HỆ THỐNG đã có chưa: có rồi thì cấp luôn; CHƯA có thì tự bật hộp thoại xin quyền hệ
+            // thống ngay lúc này (xem onRequestPermissionsResult - quyết định cấp/từ chối cho
+            // trang web SAU khi có kết quả, không cấp khống như trước để tránh lỗi "mở mic là
+            // tắt liền" do thiếu quyền hệ thống đứng sau).
             override fun onPermissionRequest(request: PermissionRequest?) {
                 if (request == null) return
-                val granted = request.resources.filter { resource ->
+                val neededPerms = LinkedHashSet<String>()
+                request.resources.forEach { resource ->
                     when (resource) {
-                        PermissionRequest.RESOURCE_AUDIO_CAPTURE ->
-                            ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                        PermissionRequest.RESOURCE_VIDEO_CAPTURE ->
-                            ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                        else -> true
+                        PermissionRequest.RESOURCE_AUDIO_CAPTURE -> neededPerms.add(Manifest.permission.RECORD_AUDIO)
+                        PermissionRequest.RESOURCE_VIDEO_CAPTURE -> neededPerms.add(Manifest.permission.CAMERA)
                     }
                 }
-                if (granted.isNotEmpty()) {
-                    request.grant(granted.toTypedArray())
-                } else {
-                    request.deny()
+                val missing = neededPerms.filter {
+                    ContextCompat.checkSelfPermission(this@MainActivity, it) != PackageManager.PERMISSION_GRANTED
                 }
-                if (granted.size < request.resources.size) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Chưa cấp quyền micro/camera cho ứng dụng - vào Cài đặt máy để cấp quyền",
-                        Toast.LENGTH_LONG
-                    ).show()
+                if (missing.isEmpty()) {
+                    request.grant(request.resources)
+                } else {
+                    pendingWebPermissionRequest = request
+                    ActivityCompat.requestPermissions(this@MainActivity, missing.toTypedArray(), REQ_PERMISSIONS)
                 }
             }
 
             // Tự cấp quyền VỊ TRÍ THẬT cho trang web (Google Maps...) khi trang yêu cầu qua
-            // navigator.geolocation - chỉ cấp nếu bản thân app ĐÃ được cấp quyền vị trí hệ thống
-            // (người dùng tự vào Cài đặt máy cấp tay - app KHÔNG còn tự xin lúc mở app nữa); nếu
-            // chưa có, từ chối an toàn thay vì để WebView tự treo hộp thoại không có quyền đứng sau.
+            // navigator.geolocation - có quyền hệ thống rồi thì cấp luôn; CHƯA có thì tự bật
+            // hộp thoại xin quyền vị trí ngay lúc này thay vì chỉ từ chối lặng lẽ như trước.
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?, callback: android.webkit.GeolocationPermissions.Callback?
             ) {
@@ -557,13 +595,16 @@ class MainActivity : AppCompatActivity() {
                     ContextCompat.checkSelfPermission(
                         this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION
                     ) == PackageManager.PERMISSION_GRANTED
-                callback?.invoke(origin, granted, false)
-                if (!granted) {
-                    Toast.makeText(
+                if (granted) {
+                    callback?.invoke(origin, true, false)
+                } else {
+                    pendingGeoOrigin = origin
+                    pendingGeoCallback = callback
+                    ActivityCompat.requestPermissions(
                         this@MainActivity,
-                        "Chưa cấp quyền vị trí cho ứng dụng - vào Cài đặt máy để cấp quyền",
-                        Toast.LENGTH_LONG
-                    ).show()
+                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                        REQ_PERMISSIONS
+                    )
                 }
             }
         }
