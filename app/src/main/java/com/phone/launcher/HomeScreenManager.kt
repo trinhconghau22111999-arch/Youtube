@@ -98,9 +98,10 @@ class HomeScreenManager(
             )
         }
 
-        val row = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
+        // Xếp DỌC, canh GIỮA màn hình theo cả 2 chiều - bắt buộc chọn 1 trong 2 để dùng.
+        val column = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ).also { it.gravity = Gravity.CENTER }
@@ -108,14 +109,16 @@ class HomeScreenManager(
 
         // YouTube: LUÔN nền đỏ cố định (đúng màu thương hiệu YouTube thật).
         ShortcutsRepository.ALL["youtube"]?.let { item ->
-            row.addView(buildSimpleAppIcon(item.label, item.iconRes, 0xFFE51400.toInt()) { onOpenShortcut(item) })
+            column.addView(buildSimpleAppIcon(item.label, item.iconRes, 0xFFE51400.toInt()) { onOpenShortcut(item) }.also {
+                (it.layoutParams as LinearLayout.LayoutParams).bottomMargin = dp(48)
+            })
         }
         // Ẩn danh: màu tím than cố định, phân biệt rõ với YouTube.
         ShortcutsRepository.ALL["incognito"]?.let { item ->
-            row.addView(buildSimpleAppIcon(item.label, item.iconRes, 0xFF4A4A9E.toInt()) { onOpenShortcut(item) })
+            column.addView(buildSimpleAppIcon(item.label, item.iconRes, 0xFF4A4A9E.toInt()) { onOpenShortcut(item) })
         }
 
-        content.addView(row)
+        content.addView(column)
         scrollView.addView(content)
         return scrollView
     }
@@ -135,9 +138,10 @@ class HomeScreenManager(
         }
     }
 
-    /** 1 nút icon ĐƠN GIẢN kiểu Android chuẩn (icon vuông bo góc + tên bên dưới, canh giữa) -
-     *  dùng cho đúng 2 mục cố định (YouTube/Ẩn danh). CHỈ CHẠM để mở, không nhấn giữ, không menu,
-     *  không đổi kích cỡ/vị trí. */
+    /** 1 nút icon TO kiểu Android chuẩn (icon vuông bo góc + tên bên dưới, canh giữa) - dùng cho
+     *  đúng 2 mục cố định (YouTube/Ẩn danh), PHÓNG TO (120dp, gấp 2.5 lần bản cũ) vì giờ màn hình
+     *  chỉ còn đúng 2 lựa chọn, không cần thu nhỏ để chừa chỗ cho tile khác nữa. CHỈ CHẠM để mở,
+     *  không nhấn giữ, không menu, không đổi kích cỡ/vị trí. */
     private fun buildSimpleAppIcon(label: String, iconRes: Int, tileColor: Int, onClick: () -> Unit): View {
         val column = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -145,7 +149,10 @@ class HomeScreenManager(
             isClickable = true
             isFocusable = true
             foreground = pressedOverlay()
-            setPadding(dp(6), dp(8), dp(6), dp(8))
+            setPadding(dp(10), dp(12), dp(10), dp(12))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            )
             setOnClickListener { onClick() }
         }
         applyWpTilePressAnim(column)
@@ -153,14 +160,14 @@ class HomeScreenManager(
         val iconBg = FrameLayout(context).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(4).toFloat()
+                cornerRadius = dp(12).toFloat()
                 setColor(tileColor)
             }
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            layoutParams = LinearLayout.LayoutParams(dp(120), dp(120))
         }
         val icon = ImageView(context).apply {
             setImageResource(iconRes)
-            val pad = dp(7)
+            val pad = dp(20)
             setPadding(pad, pad, pad, pad)
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
@@ -168,15 +175,15 @@ class HomeScreenManager(
 
         val labelView = TextView(context).apply {
             text = label
-            textSize = 12f
+            textSize = 22f
             setTextColor(Color.WHITE)
-            setShadowLayer(dp(3).toFloat(), 0f, dp(1).toFloat(), 0xCC000000.toInt())
+            setShadowLayer(dp(4).toFloat(), 0f, dp(1).toFloat(), 0xCC000000.toInt())
             gravity = Gravity.CENTER
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-            layoutParams = LinearLayout.LayoutParams(dp(76), ViewGroup.LayoutParams.WRAP_CONTENT).also {
-                it.topMargin = dp(4)
+            layoutParams = LinearLayout.LayoutParams(dp(160), ViewGroup.LayoutParams.WRAP_CONTENT).also {
+                it.topMargin = dp(10)
             }
         }
 

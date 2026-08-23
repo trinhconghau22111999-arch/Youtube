@@ -116,7 +116,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toolbarUrl: View
     private var progressBar: ProgressBar? = null
     private lateinit var homeOverlay: View
-    private lateinit var imgWallpaper: android.widget.ImageView
     private var edtHomeSearch: EditText? = null
     private lateinit var homeScreenManager: HomeScreenManager
 
@@ -197,10 +196,9 @@ class MainActivity : AppCompatActivity() {
             }
         )
         homeOverlay = findViewById(R.id.homeOverlay)
-        imgWallpaper = findViewById(R.id.imgWallpaper)
         edtHomeSearch = null  // đã xoá khỏi layout
 
-        // Khởi tạo màn hình chính - chỉ còn 3 icon cố định (YouTube, Ẩn danh, YouTube+Ẩn danh)
+        // Khởi tạo màn hình chính - chỉ còn 2 icon cố định (YouTube, Ẩn danh)
         homeScreenManager = HomeScreenManager(
             this,
             onOpenShortcut = { item -> openShortcutByKey(item.key) }
@@ -216,7 +214,6 @@ class MainActivity : AppCompatActivity() {
             FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         )
         addFloatingBackHomeButtons()
-        loadWallpaper()
 
         edtUrl.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_GO ||
@@ -245,30 +242,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Sau khi đổi hình nền ở Cài đặt rồi bấm Back quay lại đây, MainActivity không bị tạo lại
-        // (onCreate không chạy lần nữa) nên hình nền cũ vẫn còn - phải tự tải lại ở đây thì ảnh
-        // mới mới hiện ngay, không cần thoát hẳn app rồi mở lại như trước.
-        if (::imgWallpaper.isInitialized) {
-            loadWallpaper()
-        }
         // Cho WebView chạy lại bình thường (đối xứng với onPause() ở dưới).
         if (::webView.isInitialized) webView.onResume()
-        // App vừa gỡ cài đặt (menu "Gỡ cài đặt" ở trang DS Ứng Dụng, mở hộp thoại gỡ HỆ THỐNG
-        // riêng) có thể vừa biến mất khỏi máy trong lúc màn hình này ở nền - dựng lại Start/App
-        // List để nó biến mất khỏi danh sách ngay khi quay về, không cần thoát hẳn app.
         if (::homeScreenManager.isInitialized) homeScreenManager.refreshPages()
-        // Đọc lại vị trí nút Back nổi mới nhất (có thể vừa bị kéo sang chỗ khác ở màn hình
-        // khác trong lúc màn hình này ở nền) - xem giải thích đồng bộ ở FloatingBackButton.kt.
         floatingBackButtonHandle?.resync()
-    }
-
-    private fun loadWallpaper() {
-        val uriStr = WallpaperPrefs.get(this)
-        if (uriStr != null) {
-            try {
-                imgWallpaper.setImageURI(Uri.parse(uriStr))
-            } catch (e: Exception) { }
-        }
     }
 
     /** Điều hướng "về nhà" dùng chung cho nút Start (WpNavBar) và bước cuối của doBack() - LUÔN
@@ -282,6 +259,10 @@ class MainActivity : AppCompatActivity() {
         toolbarUrl.visibility = View.GONE
         progressBar?.visibility = View.GONE
         pauseAllVideos()
+        // "Thoát ra là vào lại từ đầu": xoá sạch trang YouTube đang xem (nếu có) mỗi khi quay về
+        // Start - lần sau bấm YouTube lại sẽ tải trang MỚI HOÀN TOÀN, không phải trang cũ còn dở
+        // dang lúc trước, đúng cảm giác "khởi động lại" mỗi lần chọn app.
+        if (::webView.isInitialized) webView.loadUrl("about:blank")
         homeScreenManager.goToStart()
     }
 

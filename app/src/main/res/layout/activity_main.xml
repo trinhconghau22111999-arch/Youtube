@@ -13,19 +13,13 @@
         android:layout_height="match_parent"
         android:background="#000000" />
 
-    <!-- Màn hình chính (homeOverlay) nổi đè lên WebView -->
+    <!-- Màn hình chính (homeOverlay) nổi đè lên WebView - nền ĐEN ĐẶC theo yêu cầu (không còn
+         ảnh nền/wallpaper tuỳ chỉnh nữa). -->
     <FrameLayout
         android:id="@+id/homeOverlay"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <ImageView
-            android:id="@+id/imgWallpaper"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            android:src="@drawable/default_wallpaper"
-            android:background="@color/wp_black" />
+        android:layout_height="match_parent"
+        android:background="#000000">
 
     </FrameLayout>
 
