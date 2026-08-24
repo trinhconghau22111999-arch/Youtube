@@ -44,23 +44,9 @@ import java.io.ByteArrayInputStream
 class MainActivity : AppCompatActivity() {
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
-
-    /** Nền ô địa chỉ kiểu Windows Phone: nền đen phẳng + 1 gạch chân màu NHẤN ở đáy (đặc trưng
-     *  của TextBox trên WP/Windows 10 Mobile) - vẽ bằng code (thay vì @drawable/edit_url_bg cố
-     *  định trong XML) để luôn dùng đúng màu nhấn người dùng vừa chọn ở Cài đặt, không cần build
-     *  lại app mỗi lần đổi màu. */
-    private fun buildUrlBarBackground(): android.graphics.drawable.Drawable {
-        val bg = android.graphics.drawable.GradientDrawable().apply {
-            setColor(android.graphics.Color.BLACK)
-        }
-        val underline = android.graphics.drawable.GradientDrawable().apply {
-            setColor(0xFF0078D7.toInt())
-        }
-        return android.graphics.drawable.LayerDrawable(arrayOf(bg, underline)).apply {
-            setLayerGravity(1, Gravity.BOTTOM)
-            setLayerHeight(1, dp(2))
-        }
-    }
+    // ĐÃ XOÁ HẲN: buildUrlBarBackground()/edtUrl/toolbarUrl (thanh nhập URL ẩn) theo yêu cầu -
+    // không còn cách nào gõ tay 1 địa chỉ web trong màn hình chính, chỉ còn 2 icon cố định
+    // (YouTube, Ẩn danh). Nếu sau này cần lại, phải dựng lại từ đầu.
 
     private fun enableImmersiveMode() {
         // Ẩn CẢ thanh trạng thái (giờ/mạng/pin) LẪN thanh điều hướng hệ thống (3 phím
@@ -113,8 +99,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var webView: WebView
-    private lateinit var edtUrl: EditText
-    private lateinit var toolbarUrl: View
     private var progressBar: ProgressBar? = null
     private lateinit var homeOverlay: View
     private var edtHomeSearch: EditText? = null
@@ -188,12 +172,6 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
         webView.setBackgroundColor(android.graphics.Color.BLACK) // tránh WebView chớp trắng lúc mới vào/đang tải trang (bề mặt render riêng của WebView mặc định trắng, đặt màu nền XML không đủ)
-        edtUrl = findViewById(R.id.edtUrl)
-        // Gạch chân màu nhấn của ô địa chỉ trước đây cố định trong edit_url_bg.xml (không đổi
-        // được lúc chạy) - giờ vẽ lại bằng code theo đúng màu nhấn người dùng đã chọn ở Cài đặt
-        // > Giao diện, để đổi màu ở đó là ô địa chỉ lên màu mới ngay từ lần mở app kế tiếp.
-        edtUrl.background = buildUrlBarBackground()
-        toolbarUrl = findViewById(R.id.toolbarUrl)
         // Thanh tiến trình tải trang mỏng kiểu Windows Phone (IE Mobile/Edge): 1 vạch phẳng màu
         // NHẤN nằm sát cạnh trên màn hình, không bo góc, không đổ bóng - trước đây bị xoá hẳn
         // khỏi layout (progressBar = null cứng) nên lúc tải trang KHÔNG còn dấu hiệu gì cho biết
@@ -238,15 +216,6 @@ class MainActivity : AppCompatActivity() {
         // cử chỉ/nút Back thật của hệ thống, xem onBackPressed()/doBack().
         addFloatingOffButton()
 
-        edtUrl.setOnEditorActionListener { _, actionId, event ->
-            if (actionId == EditorInfo.IME_ACTION_GO ||
-                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER)) {
-                loadFromInput()
-                true
-            } else {
-                false
-            }
-        }
         edtHomeSearch?.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_GO ||
                 (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER)) {
@@ -275,7 +244,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun showHomeOverlay() {
         homeOverlay.visibility = View.VISIBLE
-        toolbarUrl.visibility = View.GONE
         progressBar?.visibility = View.GONE
         pauseAllVideos()
         // Chỉ còn gọi ĐÚNG 1 LẦN lúc mới mở app (onCreate) - "thoát khỏi app con là thoát HẲN
@@ -361,19 +329,6 @@ class MainActivity : AppCompatActivity() {
         hideHomeOverlay()
         programmaticLoad = true
         webView.loadUrl(url)
-    }
-
-    private fun loadFromInput() {
-        var input = edtUrl.text.toString().trim()
-        if (input.isEmpty()) return
-        if (!input.startsWith("http://") && !input.startsWith("https://")) {
-            input = if (input.contains(".") && !input.contains(" ")) {
-                "https://$input"
-            } else {
-                "https://www.google.com/search?q=" + Uri.encode(input)
-            }
-        }
-        navigateTo(input)
     }
 
     // Màn hình chính (MainActivity) chỉ có ĐÚNG 1 WebView, không có khái niệm "nhiều tab".
@@ -733,7 +688,6 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                edtUrl.setText(url)
                 updateOffButtonVisibility(url)
                 view?.evaluateJavascript(AdOverlayBlocker.JS, null)
                 if (YoutubeAdSkipper.isYoutube(url)) {
@@ -1071,7 +1025,6 @@ object YoutubeAdSkipper {
                         if (video.duration && isFinite(video.duration)) {
                             video.currentTime = video.duration;
                         }
-                        video.playbackRate = 30;
                         scriptChanging = false;
                         lastAdShowing = true;
                     } else if (video) {

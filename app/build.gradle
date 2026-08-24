@@ -16,7 +16,15 @@ android {
         // APK trông như build xong nhưng cài vào máy vẫn là code cũ). Trước đây bị hardcode
         // cứng "1" ở MỌI lần build -> đây là nguyên nhân rất nhiều lần "sửa xong nhưng cài vào
         // vẫn y như cũ". Giờ tự tính theo thời gian build (giây) để luôn tăng dần thật sự.
-        def buildVersionCode = ((System.currentTimeMillis() / 1000) as Long).intValue()
+        //
+        // FIX (versionCode dùng thẳng epoch giây sẽ VỠ khoảng năm 2036): Google Play giới hạn
+        // versionCode tối đa 2100000000 - nếu dùng thẳng số giây kể từ 1/1/1970 thì mốc đó rơi
+        // vào khoảng giữa năm 2036 (2100000000 giây ~ 66.5 năm sau 1970), sau đó KHÔNG build
+        // được nữa. Trừ đi 1 mốc gốc cố định (BASE_EPOCH = 1/1/2025 00:00:00 UTC) để versionCode
+        // bắt đầu lại gần 0, dời hạn "vỡ" ra thêm ~66 năm nữa (tới khoảng năm 2091) mà vẫn giữ
+        // đúng tính chất tăng dần mỗi giây như cũ.
+        def BASE_EPOCH = 1735689600L // 2025-01-01T00:00:00Z
+        def buildVersionCode = (((System.currentTimeMillis() / 1000) as Long) - BASE_EPOCH).intValue()
         versionCode buildVersionCode
         versionName "1.0." + buildVersionCode
     }

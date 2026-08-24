@@ -25,35 +25,7 @@
 
     <!-- ĐÃ XOÁ HẲN: nút toggle desktop/mobile (User-Agent tuỳ chỉnh) theo yêu cầu. -->
 
-    <!-- Thanh địa chỉ cố định dưới cùng - CHỈ hiện khi đang xem trang web, ẩn ở trang chủ vì
-         trang chủ không phải trang web nên không cần nhập địa chỉ. -->
-    <LinearLayout
-        android:id="@+id/toolbarUrl"
-        android:visibility="gone"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:orientation="horizontal"
-        android:padding="8dp"
-        android:background="@drawable/toolbar_bg"
-        android:gravity="center_vertical">
-
-        <EditText
-            android:id="@+id/edtUrl"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/edit_url_bg"
-            android:padding="10dp"
-            android:singleLine="true"
-            android:imeOptions="actionGo"
-            android:inputType="textUri"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#888888"
-            android:hint="Nhập địa chỉ web..." />
-
-    </LinearLayout>
+    <!-- ĐÃ XOÁ HẲN: thanh nhập URL ẩn (toolbarUrl/edtUrl) theo yêu cầu - không còn cách nào gõ
+         tay 1 địa chỉ web trong màn hình chính nữa, chỉ còn 2 icon cố định (YouTube, Ẩn danh). -->
 
 </FrameLayout>
