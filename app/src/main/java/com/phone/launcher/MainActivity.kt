@@ -139,8 +139,16 @@ class MainActivity : AppCompatActivity() {
     // và lỗi "153 - Lỗi cấu hình trình phát video" (tải embed sai cách). Không đáng công sửa
     // tiếp vì tính năng "phát nền thật" khi thoát hẳn app (bấm Home vật lý) vốn không làm được
     // bằng WebView (xem giải thích trong hội thoại) - giữ app đơn giản, ổn định hơn.
-    // ĐÃ XOÁ HẲN: thanh điều hướng nổi Back/Start/Search (WpNavBar), App Bar kiểu WP, nút "Off"
-    // giả tắt màn hình (FakeScreenOff) theo yêu cầu - không còn nút nổi nào che màn hình nữa.
+    // ĐÃ XOÁ HẲN: thanh điều hướng nổi Back/Start/Search (WpNavBar), App Bar kiểu WP theo yêu
+    // cầu - không còn nút Back/Start nổi nào che màn hình nữa (dùng đúng cử chỉ/nút Back thật
+    // của hệ thống, xem doBack()).
+
+    // Nút "Off" nổi - BỔ SUNG LẠI theo yêu cầu (đã từng bị xoá cùng đợt xoá lớn trước đó), cùng
+    // kiểu nút tròn nổi kéo-thả tự "hít" vào cạnh (xem FloatingBackButton), nhưng bấm vào sẽ
+    // phủ màn hình "giả tắt" (FakeScreenOff) thay vì lùi trang - dùng khi đang xem video
+    // (YouTube...) muốn "tắt màn hình" tạm thời (video/nhạc vẫn phát, chỉ chặn chạm nhầm) mà
+    // không phải tắt màn hình thật của máy (tắt thật thì YouTube tự dừng video).
+    private var floatingOffButtonHandle: FloatingBackButton.Handle? = null
 
 
     // Video/trang toàn màn hình HTML5 (xem onShowCustomView/onHideCustomView) - dùng chung với
@@ -228,6 +236,7 @@ class MainActivity : AppCompatActivity() {
         )
         // ĐÃ GỠ HẲN thanh điều hướng nổi Back/Start/Search (WpNavBar) theo yêu cầu - dùng đúng
         // cử chỉ/nút Back thật của hệ thống, xem onBackPressed()/doBack().
+        addFloatingOffButton()
 
         edtUrl.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_GO ||
@@ -259,6 +268,9 @@ class MainActivity : AppCompatActivity() {
         // Cho WebView chạy lại bình thường (đối xứng với onPause() ở dưới).
         if (::webView.isInitialized) webView.onResume()
         if (::homeScreenManager.isInitialized) homeScreenManager.refreshPages()
+        // Đọc lại vị trí nút "Off" nổi mới nhất (có thể vừa bị kéo sang chỗ khác trong lúc màn
+        // hình này ở nền) - xem giải thích đồng bộ ở FloatingBackButton.kt.
+        floatingOffButtonHandle?.resync()
     }
 
     private fun showHomeOverlay() {
@@ -722,6 +734,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 edtUrl.setText(url)
+                updateOffButtonVisibility(url)
                 view?.evaluateJavascript(AdOverlayBlocker.JS, null)
                 if (YoutubeAdSkipper.isYoutube(url)) {
                     // AdOverlayBlocker KHÔNG chạy trên YouTube - nó dùng querySelectorAll('body *')
@@ -859,14 +872,54 @@ class MainActivity : AppCompatActivity() {
 
 
     // ĐÃ GỠ HẲN thanh điều hướng nổi Back/Start/Search (WpNavBar) theo yêu cầu - không còn nút
-    // nổi riêng của app nữa. Back giờ dùng đúng cử chỉ/nút Back thật của hệ thống (vẫn được xử
-    // lý đầy đủ qua onBackPressed()/doBack()); "về màn hình chính" = bấm Back đủ số lần cho tới
-    // khi hết lịch sử trang (xem doBack()), sau đó bấm Back 1 lần nữa để thoát hẳn app - đúng
-    // tinh thần "thoát ra là vào lại từ đầu" đã yêu cầu.
+    // Back/Start nổi riêng của app nữa. Back giờ dùng đúng cử chỉ/nút Back thật của hệ thống
+    // (vẫn được xử lý đầy đủ qua onBackPressed()/doBack()); hết lịch sử trang là thoát hẳn app
+    // luôn, đúng tinh thần "thoát khỏi app con là thoát hẳn app luôn" đã yêu cầu.
+
+    // Nút "Off" nổi - BỔ SUNG LẠI theo yêu cầu, bấm vào sẽ phủ màn hình "giả tắt" (xem
+    // FakeScreenOff) thay vì lùi trang. Icon "⏻" (nút nguồn) để phân biệt rõ với mũi tên back.
+    //
+    // fixed = false: nút NỔI và KÉO-THẢ được tự do - kéo đi đâu tuỳ ý, thả tay tự "hít" vào cạnh
+    // trái/phải gần nhất, vị trí được nhớ riêng (key theo id "off"). defaultYFraction = 0.7f để
+    // lần đầu xuất hiện không trùng vị trí mặc định của các nút khác nếu có.
+    //
+    // CHỈ HIỆN KHI ĐANG Ở TRANG YOUTUBE: nút này dùng để giả tắt màn hình lúc nghe video/nhạc
+    // YouTube chạy nền, không có ý nghĩa gì ở các trang khác -> ẩn đi (setVisible(false) ngay
+    // sau khi attach) để đỡ chiếm chỗ/gây rối màn hình chính và các trang web khác.
+    // updateOffButtonVisibility() (gọi ở onPageFinished) sẽ tự hiện lại đúng lúc vào YouTube.
+    //
+    // doubleTapOnly = false: chỉ cần CHẠM 1 LẦN là kích hoạt ngay (không cần double-tap) - vì
+    // nút Off chỉ hiện đúng lúc đang ở YouTube nên ít nguy cơ chạm nhầm hơn.
+    private fun addFloatingOffButton() {
+        val root = findViewById<FrameLayout>(R.id.rootFrame)
+        floatingOffButtonHandle = FloatingBackButton.attach(
+            activity = this,
+            root = root,
+            // Truyền [webView] để FakeScreenOff tự hạ chất lượng video xuống thấp nhất lúc bật
+            // (tiết kiệm CPU/GPU giải mã -> đỡ pin hơn khi không ai nhìn hình), và tự phục hồi
+            // đúng chất lượng cũ lúc tắt lớp phủ - xem giải thích chi tiết ở FakeScreenOff.kt.
+            onTap = { FakeScreenOff.show(this, webView) },
+            id = "off",
+            icon = "⏻",
+            defaultIsRight = false,
+            defaultYFraction = 0.7f,
+            fixed = false,
+            doubleTapOnly = false
+        )
+        floatingOffButtonHandle?.setVisible(false)
+    }
+
+    /** Hiện nút "Off" giả tắt màn hình CHỈ khi đang ở trang YouTube, ẩn đi ở mọi trang khác.
+     *  Gọi mỗi khi trang tải xong (onPageFinished) để luôn khớp đúng trang hiện tại. */
+    private fun updateOffButtonVisibility(url: String?) {
+        floatingOffButtonHandle?.setVisible(YoutubeAdSkipper.isYoutube(url))
+    }
 
     // Thoát app -> xoá sạch mọi dấu vết phiên làm việc
     override fun onDestroy() {
         clearAllSessionData()
+        floatingOffButtonHandle?.detach()
+        FakeScreenOff.hide()
         super.onDestroy()
     }
 }
