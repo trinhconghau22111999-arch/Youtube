@@ -246,9 +246,11 @@ class MainActivity : AppCompatActivity() {
         homeOverlay.visibility = View.VISIBLE
         progressBar?.visibility = View.GONE
         pauseAllVideos()
-        // Chỉ còn gọi ĐÚNG 1 LẦN lúc mới mở app (onCreate) - "thoát khỏi app con là thoát HẲN
-        // app luôn" (xem doBack()/openShortcutByKey()) nên không còn tình huống "quay lại" màn
-        // Start giữa phiên nữa; webView lúc này vừa tạo, chưa tải gì nên không cần tự xoá thêm.
+        // XOÁ LỊCH SỬ WEBVIEW khi về màn hình chính: tránh lỗi "back từ YouTube lần 2 lại nhảy
+        // về trang tìm kiếm cũ" - vì lịch sử cũ (tìm kiếm, video...) vẫn còn sót trong WebView
+        // dù homeOverlay đang che kín phía trên. Khi người dùng vào YouTube lần tiếp theo,
+        // findYoutubeSearchIndex() sẽ không còn tìm thấy trang tìm kiếm của phiên cũ nữa.
+        if (::webView.isInitialized) webView.clearHistory()
         homeScreenManager.goToStart()
     }
 
@@ -1228,3 +1230,4 @@ object VideoDownloadUI {
         })();
     """
 }
+
