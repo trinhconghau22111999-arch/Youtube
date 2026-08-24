@@ -163,7 +163,7 @@ class HomeScreenManager(
         val iconBg = FrameLayout(context).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(12).toFloat()
+                cornerRadius = dp(60).toFloat()
                 setColor(tileColor)
             }
             layoutParams = LinearLayout.LayoutParams(dp(120), dp(120))
