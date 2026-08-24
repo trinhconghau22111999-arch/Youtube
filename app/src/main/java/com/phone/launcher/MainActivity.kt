@@ -994,7 +994,7 @@ object YoutubeAdSkipper {
                         if (video.duration && isFinite(video.duration)) {
                             video.currentTime = video.duration;
                         }
-                        video.playbackRate = 20;
+                        video.playbackRate = 30;
                     }
 
                     var overlays = document.querySelectorAll(
