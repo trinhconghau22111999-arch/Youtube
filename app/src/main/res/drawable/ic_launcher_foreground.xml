@@ -5,39 +5,17 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Vòng tròn ngoài (globe outline) -->
+    <!-- Vòng tròn viền trắng -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="4"
-        android:pathData="M54,18 A36,36 0 1,1 53.999,18 Z" />
+        android:strokeWidth="3.5"
+        android:pathData="M54,54m-34,0a34,34 0,1 1,68 0a34,34 0,1 1,-68 0" />
 
-    <!-- Đường xích đạo ngang -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M18,54 L90,54" />
-
-    <!-- Đường kinh tuyến dọc -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M54,18 L54,90" />
-
-    <!-- Elip trái (múi giờ trái) -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M54,18 C38,28 38,80 54,90" />
-
-    <!-- Elip phải (múi giờ phải) -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M54,18 C70,28 70,80 54,90" />
+    <!-- 4 ô vuông nhỏ 2x2 căn giữa -->
+    <path android:fillColor="#FFFFFF" android:pathData="M35,35h15v15h-15z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M58,35h15v15h-15z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M35,58h15v15h-15z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M58,58h15v15h-15z" />
 
 </vector>
