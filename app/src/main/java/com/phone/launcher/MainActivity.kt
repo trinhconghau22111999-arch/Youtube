@@ -62,25 +62,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun enableImmersiveMode() {
-        // Ẩn CẢ thanh trạng thái (giờ/mạng/pin) LẪN thanh điều hướng hệ thống (3 phím
-        // Back/Home/Recent hoặc gesture bar) - toàn màn hình thật sự, đúng tinh thần Windows
-        // Phone (bản thân WP không có thanh điều hướng phần mềm của Android). ĐÃ GỠ HẲN thanh
-        // điều hướng nổi riêng của app (WpNavBar/TaskView, theo yêu cầu) - back/thoát app giờ
-        // dùng đúng cử chỉ/nút Back THẬT của hệ thống (vuốt từ mép hoặc hiện tạm thanh điều
-        // hướng ẩn) - vẫn được xử lý đầy đủ qua onBackPressed()/doBack() như trước, chỉ là
-        // không còn nút nổi riêng của app che lên màn hình nữa.
-        //
-        // TRƯỚC ĐÂY hàm này CHỈ ẩn thanh trạng thái, CỐ Ý giữ nguyên thanh điều hướng hệ thống -
-        // đã đổi lại theo yêu cầu (3 phím điều hướng Android vẫn lộ ra phá vỡ giao diện WP).
-        //
-        // Dùng WindowInsetsControllerCompat của androidx để hoạt động đúng trên mọi phiên bản
-        // Android (kể cả các máy Android cũ hơn không có API ẩn thanh điều hướng mới).
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        val controller = WindowCompat.getInsetsController(window, window.decorView)
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-    }
+    // Không ẩn thanh trạng thái / điều hướng - hiển thị bình thường.
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -104,12 +86,7 @@ class MainActivity : AppCompatActivity() {
         // đang thật sự hiển thị không" qua WindowInsetsCompat, thay vì đoán qua loại View đang
         // giữ focus - cách này đúng với MỌI trường hợp (EditText, ô nhập trong WebView, hay bất
         // kỳ ô nhập nào khác sau này), không cần liệt kê từng loại View một nữa.
-        if (hasFocus) {
-            val imeVisible = androidx.core.view.ViewCompat
-                .getRootWindowInsets(window.decorView)
-                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
-            if (!imeVisible) enableImmersiveMode()
-        }
+        // Không ẩn thanh hệ thống.
     }
 
     private lateinit var webView: WebView
@@ -175,7 +152,6 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(0, 0, 0, 0)
             insets
         }
-        enableImmersiveMode()
 
         // Khoá ứng dụng (PIN/Hình) đã được GỠ BỎ theo yêu cầu - vào thẳng màn chính, không cần
         // mở khoá gì cả.
