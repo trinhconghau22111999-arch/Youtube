@@ -7,7 +7,6 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.TextView
 
 /** Mở 1 màn hình MỚI trong app kèm hiệu ứng chuyển màn kiểu Windows Phone (màn mới trượt vào từ
  *  bên phải, màn cũ trượt ra bên trái - xem wp_slide_in_right.xml/wp_slide_out_left.xml) thay vì
@@ -53,27 +52,11 @@ fun Activity.statusBarHeight(): Int {
     return if (raw in 1..maxReasonable) raw else dp(24)
 }
 
-/** Mũi tên back nhỏ (◀) dùng ở các màn phụ không có FloatingBackButton toàn app (vd. Quản lý
- *  tệp) - mặc định bấm vào sẽ finish() màn hiện tại, có thể truyền hành vi khác (vd. lùi 1 cấp
- *  thư mục thay vì thoát hẳn). */
-fun Activity.buildBackArrow(onBack: () -> Unit = { finish() }): TextView =
-    TextView(this).apply {
-        text = "◀"
-        textSize = 32f
-        setTextColor(0xFFFFFFFF.toInt())
-        setPadding(dp(16), dp(10), dp(16), dp(10))
-        setBackgroundColor(0x66000000)
-        isClickable = true
-        isFocusable = true
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
-        setOnClickListener { onBack() }
-    }
-
 /** Ẩn CẢ thanh trạng thái (giờ/mạng/pin) LẪN thanh điều hướng hệ thống (3 phím Back/Home/Recent
  *  hoặc gesture bar) - toàn màn hình thật sự, đúng tinh thần Windows Phone (bản thân WP không hề
- *  có thanh điều hướng phần mềm của Android). Đa nhiệm trong app này giờ CHỈ dùng nút "Đa nhiệm"
- *  của WpNavBar (xem WpNavBar.kt/TaskView.kt) - KHÔNG còn dựa vào nút Recent/Overview của hệ
- *  thống Android nữa, nên thanh điều hướng hệ thống không cần (và không nên) hiện thường trực.
+ *  có thanh điều hướng phần mềm của Android). Back/thoát app dùng đúng cử chỉ/nút Back thật của
+ *  hệ thống (vuốt từ mép hoặc hiện tạm thanh điều hướng ẩn khi cần) - không còn thanh điều
+ *  hướng nổi riêng của app nữa, nên thanh hệ thống không cần hiện thường trực.
  *
  *  TRƯỚC ĐÂY hàm này (hideStatusBar) CHỈ ẩn thanh trạng thái, CỐ Ý giữ nguyên thanh điều hướng -
  *  đã đổi lại theo yêu cầu (3 phím điều hướng Android vẫn lộ ra phá vỡ giao diện WP).

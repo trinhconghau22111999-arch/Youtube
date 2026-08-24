@@ -26,20 +26,16 @@ import android.widget.TextView
  * dùng chung với tile trên "start" để 2 trang có cảm giác ĐỒNG BỘ tuyệt đối.
  *
  *   - Bấm vào tile  -> mở trang đó thành tab mới, tự đóng màn "đã gắn dấu".
- *   - NHẤN GIỮ tile -> hiện menu phẳng "Bỏ dấu trang" (bố cục PopupWindow giống hệt menu
- *     ghim/bỏ ghim của trang "start" - xem HomeScreenManager.showPinContextMenu), xoá xong lưới
- *     tự vẽ lại NGAY, không cần đóng/mở lại màn hình.
+ *   - NHẤN GIỮ tile -> hiện menu phẳng "Bỏ dấu trang" (dựng bằng PopupWindow riêng, xem
+ *     [showSmartDropDown] ở PopupPositioning.kt), xoá xong lưới tự vẽ lại NGAY, không cần
+ *     đóng/mở lại màn hình.
  *
- * DÙNG CHUNG cho cả 2 nơi có tính năng gắn dấu trang hiện có - Nhiều tài khoản
- * (AccountBrowserActivityBase, qua AccountStarredStore) và Ẩn danh (IncognitoActivity, qua
- * IncognitoStarredStore) - đúng theo cách TaskView.kt đang dùng chung cho Đa nhiệm ở 2 nơi đó.
+ * Hiện chỉ dùng ở Ẩn danh (IncognitoActivity, qua IncognitoStarredStore).
  *
  * KHÔNG dùng cửa sổ hệ thống riêng (WindowManager) - chỉ là 1 View thường add vào FrameLayout
- * gốc (root = "outer"/"overlayRoot" của activity gọi), đè lên nội dung duyệt web bên dưới nhưng
- * vẫn NẰM DƯỚI thanh WpNavBar (cửa sổ hệ thống TYPE_APPLICATION_PANEL riêng, luôn nổi trên cùng)
- * - xem thêm giải thích chi tiết ở TaskView.kt. Các activity gọi hàm này cần tự kiểm tra
- * Handle.isShowing ở onBackPressed() để phím Back ĐÓNG màn "đã gắn dấu" trước, thay vì lùi
- * trang web, khi màn này đang hiển thị (giống hệt cách xử lý Đa nhiệm hiện có).
+ * gốc (root = "outer"/"overlayRoot" của activity gọi), đè lên nội dung duyệt web bên dưới. Các
+ * activity gọi hàm này cần tự kiểm tra Handle.isShowing ở onBackPressed() để phím Back ĐÓNG màn
+ * "đã gắn dấu" trước, thay vì lùi trang web, khi màn này đang hiển thị.
  */
 object StarredView {
 
@@ -52,7 +48,7 @@ object StarredView {
         val isShowing: Boolean get() = overlay.parent != null
 
         /** Vẽ lại lưới tile sau khi bỏ dấu 1 trang - KHÔNG tạo lại toàn bộ overlay, tránh
-         *  giật/nháy màn hình, giống hệt cách TaskView.Handle.update() hoạt động. */
+         *  giật/nháy màn hình. */
         fun update(urls: List<String>) {
             if (isShowing) renderList(urls)
         }
@@ -108,9 +104,9 @@ object StarredView {
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
             )
-            // Đáy chừa thêm đúng chiều cao WpNavBar - thanh điều hướng nổi là cửa sổ hệ thống
-            // riêng luôn đè lên trên cùng, không chừa chỗ thì tile cuối cùng của lưới bị che.
-            setPadding(dp(20), dp(40), dp(20), dp(24) + dp(WpNavBar.HEIGHT_DP))
+            // ĐÃ GỠ HẲN thanh điều hướng nổi (WpNavBar) - không còn chừa khoảng đáy lớn cho nó
+            // nữa, chỉ cần padding an toàn nhỏ như trước đây từng dùng cho các cạnh khác.
+            setPadding(dp(20), dp(40), dp(20), dp(24))
             overScrollMode = View.OVER_SCROLL_NEVER
         }
 

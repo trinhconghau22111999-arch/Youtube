@@ -12,7 +12,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.view.Gravity
 import android.view.KeyEvent
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -66,9 +65,11 @@ class MainActivity : AppCompatActivity() {
     private fun enableImmersiveMode() {
         // Ẩn CẢ thanh trạng thái (giờ/mạng/pin) LẪN thanh điều hướng hệ thống (3 phím
         // Back/Home/Recent hoặc gesture bar) - toàn màn hình thật sự, đúng tinh thần Windows
-        // Phone (bản thân WP không có thanh điều hướng phần mềm của Android). Đa nhiệm trong
-        // app giờ CHỈ dùng nút "Đa nhiệm" của WpNavBar (xem WpNavBar.kt/TaskView.kt), KHÔNG còn
-        // dựa vào nút Recent/Overview hệ thống nữa.
+        // Phone (bản thân WP không có thanh điều hướng phần mềm của Android). ĐÃ GỠ HẲN thanh
+        // điều hướng nổi riêng của app (WpNavBar/TaskView, theo yêu cầu) - back/thoát app giờ
+        // dùng đúng cử chỉ/nút Back THẬT của hệ thống (vuốt từ mép hoặc hiện tạm thanh điều
+        // hướng ẩn) - vẫn được xử lý đầy đủ qua onBackPressed()/doBack() như trước, chỉ là
+        // không còn nút nổi riêng của app che lên màn hình nữa.
         //
         // TRƯỚC ĐÂY hàm này CHỈ ẩn thanh trạng thái, CỐ Ý giữ nguyên thanh điều hướng hệ thống -
         // đã đổi lại theo yêu cầu (3 phím điều hướng Android vẫn lộ ra phá vỡ giao diện WP).
@@ -138,8 +139,8 @@ class MainActivity : AppCompatActivity() {
     // và lỗi "153 - Lỗi cấu hình trình phát video" (tải embed sai cách). Không đáng công sửa
     // tiếp vì tính năng "phát nền thật" khi thoát hẳn app (bấm Home vật lý) vốn không làm được
     // bằng WebView (xem giải thích trong hội thoại) - giữ app đơn giản, ổn định hơn.
-    private var floatingBackButtonHandle: WpNavBar.Handle? = null
-    // ĐÃ XOÁ HẲN: Thanh App Bar kiểu WP, nút "Off" giả tắt màn hình (FakeScreenOff) theo yêu cầu.
+    // ĐÃ XOÁ HẲN: thanh điều hướng nổi Back/Start/Search (WpNavBar), App Bar kiểu WP, nút "Off"
+    // giả tắt màn hình (FakeScreenOff) theo yêu cầu - không còn nút nổi nào che màn hình nữa.
 
 
     // Video/trang toàn màn hình HTML5 (xem onShowCustomView/onHideCustomView) - dùng chung với
@@ -225,7 +226,8 @@ class MainActivity : AppCompatActivity() {
             fullscreenContainer,
             FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         )
-        addFloatingBackHomeButtons()
+        // ĐÃ GỠ HẲN thanh điều hướng nổi Back/Start/Search (WpNavBar) theo yêu cầu - dùng đúng
+        // cử chỉ/nút Back thật của hệ thống, xem onBackPressed()/doBack().
 
         edtUrl.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_GO ||
@@ -257,11 +259,10 @@ class MainActivity : AppCompatActivity() {
         // Cho WebView chạy lại bình thường (đối xứng với onPause() ở dưới).
         if (::webView.isInitialized) webView.onResume()
         if (::homeScreenManager.isInitialized) homeScreenManager.refreshPages()
-        floatingBackButtonHandle?.resync()
     }
 
-    /** Điều hướng "về nhà" dùng chung cho nút Start (WpNavBar) và bước cuối của doBack() - LUÔN
-     *  về Start ([showHomeOverlay]), đúng quy tắc gốc "Trang Start là trang chính". */
+    /** Điều hướng "về nhà" - dùng ở bước cuối của doBack() khi hết lịch sử trang - LUÔN về Start
+     *  ([showHomeOverlay]), đúng quy tắc gốc "Trang Start là trang chính". */
     private fun goHome() {
         showHomeOverlay()
     }
@@ -370,10 +371,7 @@ class MainActivity : AppCompatActivity() {
         navigateTo(input)
     }
 
-    // Màn hình chính (MainActivity) chỉ có ĐÚNG 1 WebView, không có khái niệm "nhiều tab" nên
-    // KHÔNG có nút/màn hình Đa nhiệm ở đây. Tính năng Đa nhiệm (xem TaskView.kt) chỉ áp dụng
-    // cho 2 màn hình thật sự có nhiều tab để chuyển qua lại: Ẩn danh (IncognitoActivity) và 1
-    // hồ sơ Nhiều tài khoản (AccountBrowserActivityBase) - xem toggleTaskView() ở 2 file đó.
+    // Màn hình chính (MainActivity) chỉ có ĐÚNG 1 WebView, không có khái niệm "nhiều tab".
 
     private fun clearAllSessionData() {
         webView.clearHistory()
@@ -855,84 +853,23 @@ class MainActivity : AppCompatActivity() {
         if (customView != null) {
             pane1.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             fullscreenContainer.addView(pane1, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-            fullscreenContainer.addView(buildSwipeRevealZone(), FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40)).also { it.gravity = Gravity.BOTTOM })
             fullscreenContainer.visibility = View.VISIBLE
-            // ẨN thanh Back/Start/Đa nhiệm khi xem video toàn màn hình - thanh này là 1 CỬA SỔ
-            // HỆ THỐNG riêng luôn nổi trên cùng (xem WpNavBar.kt) nên nếu không ẩn sẽ đè lên góc
-            // video suốt lúc xem. Vuốt lên từ mép đáy (xem buildSwipeRevealZone()) sẽ hiện lại
-            // thoáng qua rồi tự ẩn lại sau vài giây.
-            floatingBackButtonHandle?.hide()
         } else {
             pane1.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             root.addView(pane1, 0)
-            // Thoát video toàn màn hình -> hiện lại thanh Back/Start/Đa nhiệm bình thường.
-            floatingBackButtonHandle?.show()
-        }
-    }
-
-    /** Dải trong suốt cao 40dp áp SÁT MÉP ĐÁY màn hình, CHỈ dùng để bắt cử chỉ vuốt LÊN trong
-     *  lúc xem video toàn màn hình - KHÔNG phủ hết video (sẽ chặn mất các nút tua/play của
-     *  trình phát) mà chỉ nằm ở dải mép đáy, giống đúng cách Windows 10 Mobile lẫn YouTube thật
-     *  cho vuốt từ mép để gọi lại thanh điều hướng đang ẩn. Vuốt lên đủ xa (>24dp) trong dải này
-     *  -> hiện thanh NavBar thoáng qua rồi tự ẩn lại sau 3 giây nếu người dùng không vuốt tiếp. */
-    @SuppressLint("ClickableViewAccessibility")
-    private fun buildSwipeRevealZone(): View {
-        val autoHide = Runnable { if (customView != null) floatingBackButtonHandle?.hide() }
-        var downY = 0f
-        return View(this).apply {
-            setOnTouchListener { v, event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        downY = event.rawY
-                        false // không tiêu thụ ACTION_DOWN - chạm/tua video bên dưới vẫn hoạt
-                        // động bình thường nếu người dùng không thực sự vuốt lên.
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        if (downY - event.rawY > dp(24)) {
-                            v.removeCallbacks(autoHide)
-                            floatingBackButtonHandle?.show()
-                            v.postDelayed(autoHide, 3000)
-                        }
-                        false
-                    }
-                    else -> false
-                }
-            }
         }
     }
 
 
-    // ---------- Thanh điều hướng 3 nút kiểu Windows Phone thật: ◁ Back / ⊞ Start / 🔍 Search ----------
-    // App ẩn thanh điều hướng hệ thống (enableImmersiveMode) để full màn hình, nên cần nút
-    // điều hướng RIÊNG trong app - TRƯỚC ĐÂY dùng 1 nút tròn nổi kéo-thả tự do (kiểu nút Home
-    // vật lý của iPhone đời cũ), GIỜ thay bằng đúng 3 nút cố định ở giữa cạnh dưới màn hình như
-    // 3 nút cứng/cảm ứng thật của điện thoại Windows Phone (xem WpNavBar.kt). Back = lùi trang,
-    // Start = về màn hình chính app (⊞, đúng vai trò nút Start thật), Search = focus vào ô địa
-    // chỉ để gõ ngay (không có ô tìm kiếm hệ thống riêng như WP thật nên dùng tạm ô địa chỉ).
-    @SuppressLint("ClickableViewAccessibility")
-    private fun addFloatingBackHomeButtons() {
-        val root = findViewById<FrameLayout>(R.id.rootFrame)
-        floatingBackButtonHandle = WpNavBar.attach(
-            activity = this,
-            root = root,
-            onBack = { doBack() },
-            onStart = { if (homeOverlay.visibility != View.VISIBLE) goHome() },
-            onSearch = {
-                if (homeOverlay.visibility == View.VISIBLE) showHomeOverlay() // trang chủ không có ô địa chỉ, thoát trước
-                toolbarUrl.visibility = View.VISIBLE
-                edtUrl.requestFocus()
-                val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
-                imm?.showSoftInput(edtUrl, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-            }
-        )
-
-        // ĐÃ XOÁ HẲN App Bar kiểu WP, nút "Off" giả tắt màn hình (FakeScreenOff) theo yêu cầu.
-    }
+    // ĐÃ GỠ HẲN thanh điều hướng nổi Back/Start/Search (WpNavBar) theo yêu cầu - không còn nút
+    // nổi riêng của app nữa. Back giờ dùng đúng cử chỉ/nút Back thật của hệ thống (vẫn được xử
+    // lý đầy đủ qua onBackPressed()/doBack()); "về màn hình chính" = bấm Back đủ số lần cho tới
+    // khi hết lịch sử trang (xem doBack()), sau đó bấm Back 1 lần nữa để thoát hẳn app - đúng
+    // tinh thần "thoát ra là vào lại từ đầu" đã yêu cầu.
 
     // Thoát app -> xoá sạch mọi dấu vết phiên làm việc
     override fun onDestroy() {
         clearAllSessionData()
-        floatingBackButtonHandle?.detach()
         super.onDestroy()
     }
 }
