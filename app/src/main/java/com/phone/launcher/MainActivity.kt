@@ -761,9 +761,10 @@ class MainActivity : AppCompatActivity() {
     // trang trong lịch sử (mỗi lần chuyển video/kết quả tìm kiếm là 1 trang mới), lùi từng trang
     // một sẽ phải bấm Back rất nhiều lần mới ra khỏi YouTube. Nếu đang ở 1 trang con YouTube (và
     // KHÔNG ở sẵn trang chủ rồi) -> back NHẢY THẲNG về trang chủ YouTube (bỏ qua toàn bộ lịch sử
-    // các trang con đã xem) thay vì lùi từng bước. NẾU đang có video phát -> trước khi chuyển,
-    // THU NHỎ video đang xem thành cửa sổ nổi (mini-player) kéo/di chuyển được, để video vẫn
-    // tiếp tục phát trong lúc duyệt trang chủ chọn video khác. Đã ở trang chủ YouTube rồi thì
+    // các trang con đã xem) thay vì lùi từng bước - NGOẠI TRỪ nếu trong lịch sử có 1 trang KẾT
+    // QUẢ TÌM KIẾM gần nhất (đã gõ từ khoá tìm) thì back sẽ dừng lại ở đúng trang tìm kiếm đó
+    // TRƯỚC (xem findYoutubeSearchIndex()), để không mất kết quả đã tìm; muốn về hẳn trang chủ
+    // YouTube thì bấm back thêm 1 lần nữa từ trang tìm kiếm đó. Đã ở trang chủ YouTube rồi thì
     // back tiếp theo xử lý bình thường như các trang khác (lùi tiếp lịch sử trước khi vào
     // YouTube, hoặc về màn hình chính app).
     fun doBack() {
@@ -776,8 +777,16 @@ class MainActivity : AppCompatActivity() {
         val currentUrl = webView.url
         when {
             webView.canGoBack() && YoutubeAdSkipper.isYoutube(currentUrl) && !YoutubeAdSkipper.isYoutubeHome(currentUrl) -> {
+                val searchIndex = findYoutubeSearchIndex()
                 programmaticLoad = true
-                webView.loadUrl("https://www.youtube.com")
+                if (searchIndex >= 0) {
+                    // Có trang tìm kiếm gần nhất trong lịch sử -> lùi ĐÚNG về trang đó (không tải
+                    // lại từ đầu, chỉ tra danh sách back-forward có sẵn), thay vì nhảy thẳng home.
+                    val list = webView.copyBackForwardList()
+                    webView.goBackOrForward(searchIndex - list.currentIndex)
+                } else {
+                    webView.loadUrl("https://www.youtube.com")
+                }
             }
             // ĐÃ Ở SẴN trang chủ YouTube (vd. do back lần trước vừa nhảy về đây) -> back lần
             // NÀY = THOÁT HẲN khỏi YouTube, không chỉ lùi 1 bước lịch sử (lùi 1 bước dễ vẫn còn
@@ -796,6 +805,20 @@ class MainActivity : AppCompatActivity() {
                 super.onBackPressed()
             }
         }
+    }
+
+    /** Dò lịch sử NGƯỢC (không tải lại trang, chỉ tra danh sách back-forward có sẵn) từ vị trí
+     *  hiện tại để tìm trang KẾT QUẢ TÌM KIẾM YouTube gần nhất - dùng cho doBack() ở trên: nếu có,
+     *  back sẽ dừng ở đúng trang tìm kiếm đó trước khi về hẳn trang chủ. Trả về -1 nếu không có
+     *  trang tìm kiếm nào trong lịch sử phía trước trang hiện tại. */
+    private fun findYoutubeSearchIndex(): Int {
+        val list = webView.copyBackForwardList()
+        val currentIndex = list.currentIndex
+        for (i in currentIndex - 1 downTo 0) {
+            val url = list.getItemAtIndex(i)?.url
+            if (YoutubeAdSkipper.isYoutubeSearch(url)) return i
+        }
+        return -1
     }
 
     /** Thoát hẳn khỏi YouTube khi đang đứng ở trang chủ YouTube: duyệt lịch sử NGƯỢC (không tải
@@ -1043,6 +1066,21 @@ object YoutubeAdSkipper {
             val host = uri.host ?: return false
             val path = uri.path ?: ""
             host.endsWith("youtube.com") && (path.isEmpty() || path == "/")
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Trang KẾT QUẢ TÌM KIẾM YouTube (path "/results", có kèm tham số search_query) - dùng để
+     *  logic Back "dừng lại" ở đây 1 lần trước khi về hẳn trang chủ, thay vì nhảy thẳng từ video
+     *  về trang chủ và bỏ qua mất bước tìm kiếm đã thực hiện. */
+    fun isYoutubeSearch(url: String?): Boolean {
+        if (url.isNullOrEmpty()) return false
+        return try {
+            val uri = android.net.Uri.parse(url)
+            val host = uri.host ?: return false
+            val path = uri.path ?: ""
+            host.endsWith("youtube.com") && path == "/results" && uri.getQueryParameter("search_query") != null
         } catch (e: Exception) {
             false
         }
