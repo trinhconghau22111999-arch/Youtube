@@ -149,7 +149,7 @@ object StarredView {
 
         // Tiêu đề
         content.addView(TextView(activity).apply {
-            text = "đã gắn dấu"
+            text = "Đã gắn dấu"
             textSize = 30f
             setTextColor(Color.WHITE)
             typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
@@ -213,8 +213,9 @@ object StarredView {
                 // Checkbox / radio indicator
                 val checkBox = TextView(activity).apply {
                     textSize = 20f
-                    text = if (selectedUrls.contains(url)) "✓" else "○"
+                    text = if (selectedUrls.contains(url)) "✓" else ""
                     setTextColor(if (selectedUrls.contains(url)) 0xFF0078D7.toInt() else 0xFF555555.toInt())
+                    visibility = if (selectedUrls.contains(url)) android.view.View.VISIBLE else android.view.View.INVISIBLE
                     layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).also {
                         it.rightMargin = dp(12)
                         it.gravity = Gravity.CENTER
@@ -247,6 +248,7 @@ object StarredView {
                 val btnDelete = TextView(activity).apply {
                     text = "🗑"
                     textSize = 18f
+                    setTextColor(Color.WHITE)
                     setPadding(dp(8), dp(4), dp(4), dp(4))
                     setOnClickListener { onRemove(url) }
                 }
@@ -265,8 +267,8 @@ object StarredView {
                     row.setBackgroundColor(
                         if (selectedUrls.contains(url)) 0xFF1A3A5C.toInt() else Color.TRANSPARENT
                     )
-                    checkBox.text = if (selectedUrls.contains(url)) "✓" else "○"
-                    checkBox.setTextColor(if (selectedUrls.contains(url)) 0xFF0078D7.toInt() else 0xFF555555.toInt())
+                    checkBox.text = if (selectedUrls.contains(url)) "✓" else ""
+                    checkBox.visibility = if (selectedUrls.contains(url)) android.view.View.VISIBLE else android.view.View.INVISIBLE
                     true
                 }
 
@@ -279,8 +281,8 @@ object StarredView {
                         row.setBackgroundColor(
                             if (selectedUrls.contains(url)) 0xFF1A3A5C.toInt() else Color.TRANSPARENT
                         )
-                        checkBox.text = if (selectedUrls.contains(url)) "✓" else "○"
-                        checkBox.setTextColor(if (selectedUrls.contains(url)) 0xFF0078D7.toInt() else 0xFF555555.toInt())
+                        checkBox.text = if (selectedUrls.contains(url)) "✓" else ""
+                        checkBox.visibility = if (selectedUrls.contains(url)) android.view.View.VISIBLE else android.view.View.INVISIBLE
                     } else {
                         onOpen(url)
                     }
@@ -344,10 +346,10 @@ object StarredView {
             ViewGroup.LayoutParams.WRAP_CONTENT
         ))
 
-        outerLayout.addView(actionBar)
         outerLayout.addView(scrollView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
+        outerLayout.addView(actionBar)
 
         overlay.addView(outerLayout, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
