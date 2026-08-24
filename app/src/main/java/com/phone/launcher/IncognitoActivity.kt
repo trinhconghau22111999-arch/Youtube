@@ -30,14 +30,14 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
-/** Chế độ Ẩn danh - chạy ở TIẾN TRÌNH RIÊNG (xem android:process trong Manifest) nên dữ liệu
- *  (cookie, phiên đăng nhập, cache) hoàn toàn TÁCH BIỆT khỏi trình duyệt chính, không ảnh hưởng
- *  các tài khoản đang đăng nhập ở đó.
- *  THOÁT RA (đóng màn hình Ẩn danh): TẤT CẢ tab đang mở bị XOÁ SẠCH ngay, KHÔNG lưu lại - mở lại
- *  Ẩn danh lần sau luôn bắt đầu từ đầu (trống), đúng nghĩa duyệt web ẩn danh không để lại dấu vết.
+/** Trình duyệt phụ "Duyệt web" - chạy ở TIẾN TRÌNH RIÊNG (xem android:process trong Manifest)
+ *  nên cookie/phiên đăng nhập TÁCH BIỆT hoàn toàn khỏi trình duyệt chính (YouTube), không ảnh
+ *  hưởng tài khoản đang đăng nhập ở đó.
+ *  THOÁT RA: danh sách URL các tab được LƯU LẠI (qua IncognitoSessionStore) và KHÔI PHỤC khi
+ *  vào lại - người dùng tiếp tục đúng các trang đang mở. Cookie/phiên đăng nhập trong process
+ *  này KHÔNG được lưu (process bị kill khi thoát), nên sẽ cần đăng nhập lại trang yêu cầu xác thực.
  *  DẤU SAO: lưu VĨNH VIỄN qua IncognitoStarredStore, không mất khi đóng phiên.
- *  KHÔNG giới hạn số tab; TẤT CẢ các tab ẩn danh dùng CHUNG 1 phiên/cookie với nhau (đăng nhập ở
- *  tab này thì tab kia trong CÙNG phiên ẩn danh cũng thấy đã đăng nhập). */
+ *  KHÔNG giới hạn số tab; TẤT CẢ các tab dùng CHUNG 1 phiên/cookie với nhau trong cùng 1 lần mở. */
 class IncognitoActivity : AppCompatActivity() {
 
     /** Thoát màn này kèm hiệu ứng "trượt ra bên phải" kiểu Windows Phone, dù finish() được gọi
@@ -173,16 +173,27 @@ class IncognitoActivity : AppCompatActivity() {
         }
         // ĐÃ GỠ HẲN thanh điều hướng nổi Back/Start/Đa nhiệm (WpNavBar) theo yêu cầu.
 
-        // ĐÚNG NGHĨA Ẩn danh: KHÔNG khôi phục tab của lần trước nữa - mỗi lần mở Ẩn danh luôn
-        // bắt đầu từ đầu (trống), và khi thoát (onDestroy) sẽ xoá sạch mọi tab đang mở, không
-        // để lại dấu vết cho lần sau.
         val startUrl = intent.getStringExtra("initial_url")
         if (startUrl != null) {
+            // Được mở từ shortcut kèm URL cụ thể (vd bấm icon "Duyệt web" từ màn chính kèm URL)
+            // -> mở URL đó làm tab đầu tiên, bỏ qua session đã lưu.
             newTab(startUrl)
         } else {
-            // Mở trang TRỐNG (nền đen), để người dùng tự gõ địa chỉ muốn vào, thanh địa chỉ
-            // cũng để trống (không điền sẵn) - xem switchTab().
-            newTab("https://www.google.com")
+            // Khôi phục các tab của phiên trước (nếu có) để người dùng tiếp tục đúng chỗ đã xem.
+            // Cookie/phiên đăng nhập trong process này KHÔNG được giữ (process riêng bị kill khi
+            // thoát app), nhưng URL thì được lưu lại để mở lại đúng trang.
+            val savedUrls = IncognitoSessionStore.loadUrls(this)
+            if (savedUrls != null) {
+                val savedActive = IncognitoSessionStore.loadActiveIndex(this)
+                savedUrls.forEach { url -> newTab(url) }
+                // Chuyển về đúng tab đang active lần trước (nếu index còn hợp lệ)
+                if (savedActive in tabs.indices && savedActive != activeIndex) {
+                    switchTab(savedActive)
+                }
+            } else {
+                // Chưa có phiên nào được lưu -> mở Google làm trang mặc định
+                newTab("https://www.google.com")
+            }
         }
     }
 
@@ -498,7 +509,11 @@ class IncognitoActivity : AppCompatActivity() {
     // URL các tab để khôi phục, giờ đảm bảo dữ liệu cũ - nếu còn sót từ bản trước - cũng bị xoá
     // sạch, không để lại dấu vết gì khi thoát Ẩn danh).
     private fun saveSession() {
-        IncognitoSessionStore.clear(this)
+        // Lưu danh sách URL các tab hiện tại để khôi phục khi vào lại app.
+        // Tab đang hiển thị about:blank hoặc chưa load gì được lưu là chuỗi rỗng (sẽ bị lọc bỏ
+        // khi restore nếu không còn URL nào khác).
+        val urls = tabs.map { it.webView.url }
+        IncognitoSessionStore.save(this, urls, activeIndex)
     }
 
     override fun onBackPressed() {
