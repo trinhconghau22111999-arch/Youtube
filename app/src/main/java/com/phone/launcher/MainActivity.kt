@@ -163,7 +163,7 @@ class MainActivity : AppCompatActivity() {
         AdBlocker.enabled = true // luôn bật, không cho tắt
 
         webView = findViewById(R.id.webView)
-        webView.setBackgroundColor(android.graphics.Color.BLACK) // tránh WebView chớp trắng lúc mới vào/đang tải trang (bề mặt render riêng của WebView mặc định trắng, đặt màu nền XML không đủ)
+        webView.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, R.color.app_bg)) // theo theme sáng/tối lúc mới vào/đang tải trang (bề mặt render riêng của WebView mặc định trắng, đặt màu nền XML không đủ)
         edtUrl = findViewById(R.id.edtUrl)
         // Gạch chân màu nhấn của ô địa chỉ trước đây cố định trong edit_url_bg.xml (không đổi
         // được lúc chạy) - giờ vẽ lại bằng code theo đúng màu nhấn người dùng đã chọn ở Cài đặt
