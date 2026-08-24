@@ -48,12 +48,12 @@
         <item name="cornerSize">0dp</item>
     </style>
 
-    <style name="Theme.AdBlockBrowser" parent="Theme.MaterialComponents.NoActionBar">
+    <style name="Theme.AdBlockBrowser" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/wp_black</item>
         <item name="colorPrimaryDark">@color/wp_black</item>
         <item name="colorAccent">@color/wp_accent</item>
         <item name="colorSecondary">@color/wp_accent</item>
-        <item name="android:windowBackground">@color/wp_black</item>
+        <item name="android:windowBackground">@color/app_bg</item>
         <item name="android:textColorPrimary">@color/pure_white</item>
         <item name="android:statusBarColor">@color/wp_black</item>
         <item name="android:navigationBarColor">@color/wp_black</item>
@@ -75,7 +75,7 @@
          hộp thoại hiện lên - lỗi này trước đây có ở CalendarActivity, ClockActivity,
          FilesActivity vì dùng nhầm android.app.AlertDialog gốc thay vì bản có theme riêng). -->
     <style name="Theme.WP.Dialog" parent="Theme.AppCompat.Dialog.Alert">
-        <item name="android:windowBackground">@color/wp_black</item>
+        <item name="android:windowBackground">@color/app_bg</item>
         <item name="android:textColor">@color/pure_white</item>
         <item name="android:textColorPrimary">@color/pure_white</item>
         <item name="android:textColorSecondary">@color/wp_gray_light</item>
