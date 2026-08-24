@@ -53,4 +53,10 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.activity:activity-ktx:1.9.0'
+    // FIX BUILD FAILED (aapt2 linking): commit dọn dependency trước đó lỡ xoá thư viện này vì
+    // tưởng không code nào dùng tới - nhưng Theme.AdBlockBrowser (values.xml) lại kế thừa từ
+    // Theme.MaterialComponents.DayNight.NoActionBar và ShapeAppearance.WP.Flat kế thừa từ
+    // ShapeAppearance.MaterialComponents.SmallComponent, cả 2 đều thuộc thư viện Material
+    // Components - thiếu nó khiến aapt2 không link được resource, build luôn FAILED.
+    implementation 'com.google.android.material:material:1.12.0'
 }
