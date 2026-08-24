@@ -171,7 +171,7 @@ class MainActivity : AppCompatActivity() {
         AdBlocker.enabled = true // luôn bật, không cho tắt
 
         webView = findViewById(R.id.webView)
-        webView.setBackgroundColor(android.graphics.Color.BLACK) // tránh WebView chớp trắng lúc mới vào/đang tải trang (bề mặt render riêng của WebView mặc định trắng, đặt màu nền XML không đủ)
+        webView.setBackgroundColor(android.graphics.Color.TRANSPARENT) // Trong suốt: để nền rootFrame (app_bg, đổi theo theme) lộ ra thay vì đen cứng - tránh nháy đen/trắng khi tải trang
         // Thanh tiến trình tải trang mỏng kiểu Windows Phone (IE Mobile/Edge): 1 vạch phẳng màu
         // NHẤN nằm sát cạnh trên màn hình, không bo góc, không đổ bóng - trước đây bị xoá hẳn
         // khỏi layout (progressBar = null cứng) nên lúc tải trang KHÔNG còn dấu hiệu gì cho biết
@@ -181,7 +181,7 @@ class MainActivity : AppCompatActivity() {
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
             progressTintList = android.content.res.ColorStateList.valueOf(0xFF0078D7.toInt())
-            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.BLACK)
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
             visibility = View.GONE
         }
         findViewById<FrameLayout>(R.id.rootFrame).addView(
