@@ -118,7 +118,13 @@ object FakeScreenOff {
         if (overlay != null) return // đang hiện rồi thì thôi, tránh add trùng window
 
         pendingWebView = webView
-        webView?.evaluateJavascript(JS_LOWER_QUALITY, null)
+        // Bọc try/catch tương tự [hide] bên dưới - phòng hờ trường hợp cực hiếm WebView truyền
+        // vào đã ở trạng thái không hợp lệ ngay lúc gọi (an toàn tương tự, không bắt buộc phải
+        // hạ được chất lượng video bằng mọi giá).
+        try {
+            webView?.evaluateJavascript(JS_LOWER_QUALITY, null)
+        } catch (e: Exception) {
+        }
 
         fun dp(v: Int) = (v * activity.resources.displayMetrics.density).toInt()
 
@@ -245,7 +251,17 @@ object FakeScreenOff {
         }
         overlay = null
 
-        pendingWebView?.evaluateJavascript(JS_RESTORE_QUALITY, null)
+        // FIX: nếu WebView đã lưu (pendingWebView) bị crash renderer VÀ được thay bằng WebView
+        // MỚI trong lúc lớp phủ đang hiện (xem recreateWebViewAfterCrash() ở MainActivity),
+        // tham chiếu ở đây vẫn còn trỏ tới WebView CŨ đã destroy() - gọi evaluateJavascript() lên
+        // 1 WebView đã huỷ ném thẳng IllegalStateException, làm crash CẢ APP ngay lúc người dùng
+        // chỉ đang thao tác bình thường (chạm đúp tắt màn hình giả). Bọc try/catch để tình huống
+        // hiếm này chỉ đơn giản là bỏ qua bước khôi phục chất lượng video (không quan trọng bằng
+        // việc không được để app crash).
+        try {
+            pendingWebView?.evaluateJavascript(JS_RESTORE_QUALITY, null)
+        } catch (e: Exception) {
+        }
         pendingWebView = null
     }
 }

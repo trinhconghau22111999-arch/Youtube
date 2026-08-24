@@ -60,12 +60,57 @@ class MainActivity : AppCompatActivity() {
         // TRƯỚC ĐÂY hàm này CHỈ ẩn thanh trạng thái, CỐ Ý giữ nguyên thanh điều hướng hệ thống -
         // đã đổi lại theo yêu cầu (3 phím điều hướng Android vẫn lộ ra phá vỡ giao diện WP).
         //
+        // NGOẠI LỆ (mới): xem applySystemBarsForCurrentState() bên dưới - khi đang ở trang
+        // YouTube VÀ máy đang xoay dọc, KHÔNG gọi hàm này nữa, thay vào đó gọi showSystemBars()
+        // để luôn lộ ra cả thanh trạng thái lẫn 3 phím điều hướng, theo yêu cầu.
+        //
         // Dùng WindowInsetsControllerCompat của androidx để hoạt động đúng trên mọi phiên bản
         // Android (kể cả các máy Android cũ hơn không có API ẩn thanh điều hướng mới).
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.hide(WindowInsetsCompat.Type.systemBars())
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    /** Ngược lại với enableImmersiveMode(): hiện lại HẲN thanh trạng thái + 3 phím điều hướng hệ
+     *  thống (không phải kiểu "vuốt ra tạm" như BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, mà hiện
+     *  LUÔN LUÔN, chiếm chỗ thật trên màn hình) - dùng setDecorFitsSystemWindows(true) để hệ
+     *  thống tự chừa đúng khoảng trống cho 2 thanh này, tránh nội dung app bị che khuất sau
+     *  chúng trên các máy có notch/gesture bar khác nhau. */
+    private fun showSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.show(WindowInsetsCompat.Type.systemBars())
+    }
+
+    /** YÊU CẦU MỚI: khi đang xem YouTube VÀ máy đang cầm DỌC (portrait) -> LUÔN hiện thanh trạng
+     *  thái ở trên + 3 phím điều hướng ở dưới (showSystemBars()), không ẩn đi như chế độ toàn
+     *  màn hình mặc định của app nữa. Mọi trường hợp khác (đang ở trang khác không phải YouTube,
+     *  hoặc YouTube nhưng đang xoay NGANG để xem video toàn màn hình) vẫn giữ nguyên hành vi cũ:
+     *  ẩn hết 2 thanh này (enableImmersiveMode()).
+     *
+     *  Được gọi lại ở MỌI thời điểm trạng thái có thể đổi: xoay máy (onConfigurationChanged),
+     *  cửa sổ lấy lại focus (onWindowFocusChanged), trang web tải xong - đổi URL
+     *  (onPageFinished), và về lại màn hình Start (showHomeOverlay()). */
+    private fun applySystemBarsForCurrentState() {
+        val isPortrait = resources.configuration.orientation ==
+            android.content.res.Configuration.ORIENTATION_PORTRAIT
+        val isOnYoutubePage = ::webView.isInitialized &&
+            homeOverlay.visibility != View.VISIBLE &&
+            YoutubeAdSkipper.isYoutube(webView.url)
+        if (isPortrait && isOnYoutubePage) {
+            showSystemBars()
+        } else {
+            enableImmersiveMode()
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // MainActivity khai báo configChanges="orientation|..." trong Manifest (để không bị huỷ
+        // và dựng lại Activity mỗi lần xoay máy) -> phải TỰ cập nhật lại thanh trạng thái/điều
+        // hướng ở đây mỗi khi xoay, hệ thống không tự làm giúp trong trường hợp này.
+        applySystemBarsForCurrentState()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -94,7 +139,7 @@ class MainActivity : AppCompatActivity() {
             val imeVisible = androidx.core.view.ViewCompat
                 .getRootWindowInsets(window.decorView)
                 ?.isVisible(WindowInsetsCompat.Type.ime()) == true
-            if (!imeVisible) enableImmersiveMode()
+            if (!imeVisible) applySystemBarsForCurrentState()
         }
     }
 
@@ -242,6 +287,42 @@ class MainActivity : AppCompatActivity() {
         floatingOffButtonHandle?.resync()
     }
 
+    /** Dựng lại WebView mới TOÀN BỘ để thay cho WebView cũ đã bị crash renderer (xem
+     *  onRenderProcessGone() ở setupWebView()) - KHÔNG được gọi lại bất kỳ hàm nào trên WebView
+     *  cũ vì tiến trình render của nó đã chết, gọi vào sẽ tự app crash tiếp. Gỡ WebView cũ khỏi
+     *  rootFrame, huỷ hẳn nó, tạo WebView mới đúng vị trí/kích thước cũ, gắn lại đầy đủ
+     *  settings/WebViewClient/WebChromeClient qua setupWebView() rồi tải lại đúng trang đang xem
+     *  (nếu có) - người dùng chỉ thấy trang tải lại chứ KHÔNG bị đá về màn hình Start/mất cả app. */
+    private fun recreateWebViewAfterCrash(crashedUrl: String?) {
+        val rootFrame = findViewById<FrameLayout>(R.id.rootFrame)
+        val oldWebView = webView
+        val index = rootFrame.indexOfChild(oldWebView).let { if (it < 0) 0 else it }
+        val params = oldWebView.layoutParams
+
+        rootFrame.removeView(oldWebView)
+        // destroy() phải gọi SAU KHI đã gỡ khỏi cây view, và bọc try/catch vì WebView có renderer
+        // đã chết đôi khi tự ném lỗi ngay trong lúc dọn dẹp.
+        try { oldWebView.destroy() } catch (e: Exception) { }
+
+        webView = WebView(this).apply { id = R.id.webView }
+        webView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        rootFrame.addView(webView, index, params)
+
+        setupWebView()
+
+        Toast.makeText(
+            this, "Trang web vừa gặp sự cố khi đổi giao diện, đang tải lại...", Toast.LENGTH_SHORT
+        ).show()
+
+        if (crashedUrl != null && homeOverlay.visibility != View.VISIBLE) {
+            // Đang xem 1 trang (không phải màn hình Start) lúc crash -> tải lại đúng trang đó.
+            navigateTo(crashedUrl)
+        } else {
+            // Đang ở Start hoặc không rõ trang đang xem -> quay về Start cho an toàn.
+            showHomeOverlay()
+        }
+    }
+
     private fun showHomeOverlay() {
         homeOverlay.visibility = View.VISIBLE
         progressBar?.visibility = View.GONE
@@ -252,6 +333,8 @@ class MainActivity : AppCompatActivity() {
         // findYoutubeSearchIndex() sẽ không còn tìm thấy trang tìm kiếm của phiên cũ nữa.
         if (::webView.isInitialized) webView.clearHistory()
         homeScreenManager.goToStart()
+        // Về Start -> không còn ở trang YouTube nữa -> ẩn lại 2 thanh hệ thống như mặc định.
+        applySystemBarsForCurrentState()
     }
 
     private val pauseRetryHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -688,9 +771,33 @@ class MainActivity : AppCompatActivity() {
                 handler?.cancel()
             }
 
+            // FIX "đổi màu nền văng ra màn hình start": khi người dùng đổi theme (sáng/tối) trên
+            // YouTube, tiến trình render Chromium của WebView đôi khi bị crash (renderer process
+            // gone) do phải vẽ lại toàn bộ theme cùng lúc. TRƯỚC ĐÂY không override hàm này ->
+            // hành vi MẶC ĐỊNH của Android là kill LUÔN CẢ APP khi renderer chết -> app khởi động
+            // lại từ đầu -> người dùng thấy "văng" thẳng về màn hình Start. Giờ tự bắt sự kiện
+            // này: gỡ WebView cũ (đã hỏng, không dùng lại được) ra khỏi layout, hủy nó, tạo lại
+            // WebView mới rồi tải lại đúng trang đang xem - app không bị kill, người dùng chỉ
+            // thấy trang tải lại chứ không bị đá về Start.
+            override fun onRenderProcessGone(
+                view: WebView?,
+                detail: android.webkit.RenderProcessGoneDetail?
+            ): Boolean {
+                val crashedUrl = view?.url
+                runOnUiThread {
+                    recreateWebViewAfterCrash(crashedUrl)
+                }
+                // Trả về true để báo cho hệ thống là app ĐÃ TỰ XỬ LÝ xong sự cố này rồi -
+                // không cần hệ thống can thiệp/kill app nữa.
+                return true
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 updateOffButtonVisibility(url)
+                // Đổi trang xong (có thể vừa vào/rời YouTube) -> cập nhật lại ngay thanh trạng
+                // thái/điều hướng hệ thống có nên hiện hay ẩn (xem applySystemBarsForCurrentState()).
+                applySystemBarsForCurrentState()
                 view?.evaluateJavascript(AdOverlayBlocker.JS, null)
                 if (YoutubeAdSkipper.isYoutube(url)) {
                     // AdOverlayBlocker KHÔNG chạy trên YouTube - nó dùng querySelectorAll('body *')
