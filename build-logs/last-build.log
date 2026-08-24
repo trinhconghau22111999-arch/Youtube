@@ -14,8 +14,8 @@ Daemon will be stopped at the end of the build
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
 > Task :app:checkKotlinGradlePluginConfigurationErrors
-> Task :app:dataBindingMergeDependencyArtifactsDebug
 > Task :app:generateDebugResValues
+> Task :app:dataBindingMergeDependencyArtifactsDebug
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
 > Task :app:mergeDebugResources
@@ -27,10 +27,10 @@ Daemon will be stopped at the end of the build
 > Task :app:extractDeepLinksDebug
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
 > Task :app:javaPreCompileDebug
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
-> Task :app:processDebugManifestForPackage
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
 > Task :app:compressDebugAssets
@@ -38,17 +38,10 @@ Daemon will be stopped at the end of the build
 > Task :app:mergeDebugStartupProfile
 > Task :app:mergeDebugJniLibFolders
 > Task :app:checkDebugDuplicateClasses
-> Task :app:mergeDebugNativeLibs
 > Task :app:processDebugResources
+> Task :app:mergeDebugNativeLibs
+> Task :app:compileDebugKotlin
 > Task :app:mergeExtDexDebug
-> Task :app:mergeLibDexDebug
-
-> Task :app:stripDebugDebugSymbols
-Unable to strip the following libraries, packaging them as they are: libimage_processing_util_jni.so.
-
-> Task :app:validateSigningDebug
-> Task :app:writeDebugAppMetadata
-> Task :app:writeDebugSigningConfigVersions
 
 > Task :app:compileDebugKotlin
 w: file:///home/runner/work/Youtube_wed-99/Youtube_wed-99/app/src/main/java/com/phone/launcher/IncognitoActivity.kt:226:22 'setter for saveFormData: Boolean' is deprecated. Deprecated in Java
@@ -69,13 +62,21 @@ w: file:///home/runner/work/Youtube_wed-99/Youtube_wed-99/app/src/main/java/com/
 > Task :app:dexBuilderDebug
 > Task :app:mergeDebugGlobalSynthetics
 > Task :app:processDebugJavaRes
+> Task :app:mergeLibDexDebug
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libimage_processing_util_jni.so.
+
 > Task :app:mergeProjectDexDebug
 > Task :app:mergeDebugJavaResource
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
 > Task :app:packageDebug
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 1m 38s
+BUILD SUCCESSFUL in 1m 45s
 40 actionable tasks: 40 executed
 
 === APK thực tế tìm thấy sau build (find app/build/outputs -iname '*.apk') ===
