@@ -242,6 +242,42 @@ class MainActivity : AppCompatActivity() {
         floatingOffButtonHandle?.resync()
     }
 
+    /** Dựng lại WebView mới TOÀN BỘ để thay cho WebView cũ đã bị crash renderer (xem
+     *  onRenderProcessGone() ở setupWebView()) - KHÔNG được gọi lại bất kỳ hàm nào trên WebView
+     *  cũ vì tiến trình render của nó đã chết, gọi vào sẽ tự app crash tiếp. Gỡ WebView cũ khỏi
+     *  rootFrame, huỷ hẳn nó, tạo WebView mới đúng vị trí/kích thước cũ, gắn lại đầy đủ
+     *  settings/WebViewClient/WebChromeClient qua setupWebView() rồi tải lại đúng trang đang xem
+     *  (nếu có) - người dùng chỉ thấy trang tải lại chứ KHÔNG bị đá về màn hình Start/mất cả app. */
+    private fun recreateWebViewAfterCrash(crashedUrl: String?) {
+        val rootFrame = findViewById<FrameLayout>(R.id.rootFrame)
+        val oldWebView = webView
+        val index = rootFrame.indexOfChild(oldWebView).let { if (it < 0) 0 else it }
+        val params = oldWebView.layoutParams
+
+        rootFrame.removeView(oldWebView)
+        // destroy() phải gọi SAU KHI đã gỡ khỏi cây view, và bọc try/catch vì WebView có renderer
+        // đã chết đôi khi tự ném lỗi ngay trong lúc dọn dẹp.
+        try { oldWebView.destroy() } catch (e: Exception) { }
+
+        webView = WebView(this).apply { id = R.id.webView }
+        webView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        rootFrame.addView(webView, index, params)
+
+        setupWebView()
+
+        Toast.makeText(
+            this, "Trang web vừa gặp sự cố khi đổi giao diện, đang tải lại...", Toast.LENGTH_SHORT
+        ).show()
+
+        if (crashedUrl != null && homeOverlay.visibility != View.VISIBLE) {
+            // Đang xem 1 trang (không phải màn hình Start) lúc crash -> tải lại đúng trang đó.
+            navigateTo(crashedUrl)
+        } else {
+            // Đang ở Start hoặc không rõ trang đang xem -> quay về Start cho an toàn.
+            showHomeOverlay()
+        }
+    }
+
     private fun showHomeOverlay() {
         homeOverlay.visibility = View.VISIBLE
         progressBar?.visibility = View.GONE
@@ -686,6 +722,27 @@ class MainActivity : AppCompatActivity() {
                     Toast.LENGTH_LONG
                 ).show()
                 handler?.cancel()
+            }
+
+            // FIX "đổi màu nền văng ra màn hình start": khi người dùng đổi theme (sáng/tối) trên
+            // YouTube, tiến trình render Chromium của WebView đôi khi bị crash (renderer process
+            // gone) do phải vẽ lại toàn bộ theme cùng lúc. TRƯỚC ĐÂY không override hàm này ->
+            // hành vi MẶC ĐỊNH của Android là kill LUÔN CẢ APP khi renderer chết -> app khởi động
+            // lại từ đầu -> người dùng thấy "văng" thẳng về màn hình Start. Giờ tự bắt sự kiện
+            // này: gỡ WebView cũ (đã hỏng, không dùng lại được) ra khỏi layout, hủy nó, tạo lại
+            // WebView mới rồi tải lại đúng trang đang xem - app không bị kill, người dùng chỉ
+            // thấy trang tải lại chứ không bị đá về Start.
+            override fun onRenderProcessGone(
+                view: WebView?,
+                detail: android.webkit.RenderProcessGoneDetail?
+            ): Boolean {
+                val crashedUrl = view?.url
+                runOnUiThread {
+                    recreateWebViewAfterCrash(crashedUrl)
+                }
+                // Trả về true để báo cho hệ thống là app ĐÃ TỰ XỬ LÝ xong sự cố này rồi -
+                // không cần hệ thống can thiệp/kill app nữa.
+                return true
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
