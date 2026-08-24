@@ -32,26 +32,18 @@ Daemon will be stopped at the end of the build
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
-> Task :app:desugarDebugFileDependencies
-> Task :app:compressDebugAssets
-> Task :app:mergeDebugStartupProfile
-> Task :app:mergeDebugJniLibFolders
-> Task :app:checkDebugDuplicateClasses
-> Task :app:mergeDebugNativeLibs
 > Task :app:processDebugManifestForPackage
-> Task :app:mergeLibDexDebug
-
-> Task :app:stripDebugDebugSymbols
-Unable to strip the following libraries, packaging them as they are: libimage_processing_util_jni.so.
-
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
 > Task :app:processDebugResources
-> Task :app:validateSigningDebug
-> Task :app:mergeExtDexDebug
-> Task :app:writeDebugAppMetadata
-> Task :app:writeDebugSigningConfigVersions
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugStartupProfile
+
+> Task :app:compileDebugKotlin
+e: file:///home/runner/work/Youtube_wed-99/Youtube_wed-99/app/src/main/java/com/phone/launcher/IncognitoActivity.kt:78:77 Type mismatch: inferred type is LinearLayout but Context was expected
 
 > Task :app:compileDebugKotlin FAILED
-e: file:///home/runner/work/Youtube_wed-99/Youtube_wed-99/app/src/main/java/com/phone/launcher/IncognitoActivity.kt:78:77 Type mismatch: inferred type is LinearLayout but Context was expected
+> Task :app:mergeExtDexDebug
 
 FAILURE: Build failed with an exception.
 
@@ -260,7 +252,7 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 1m 28s
-32 actionable tasks: 32 executed
+BUILD FAILED in 1m 31s
+25 actionable tasks: 25 executed
 
 === APK thực tế tìm thấy sau build (find app/build/outputs -iname '*.apk') ===
