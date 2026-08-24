@@ -351,14 +351,9 @@ class IncognitoActivity : AppCompatActivity() {
                 // Chặn scheme không phải http/https (tel:, intent:, v.v.)
                 if (scheme != "http" && scheme != "https") return true
 
-                // ── ẨN DANH: KHÔNG cho phép nhấp link thông thường mở trang ──
-                // Chỉ cho load nếu lệnh đến từ code (loadInTab / goBack / newTab).
-                // Nếu người dùng nhấp link trong trang -> chặn và nhắc nhở nhấn giữ.
-                // QUAN TRỌNG: KHÔNG reset cờ ở đây - nếu trang đích có NHIỀU bước chuyển hướng
-                // (ví dụ tìm kiếm Google hay redirect 2-3 lần), reset ngay sau lần đầu sẽ khiến
-                // các bước chuyển hướng tiếp theo bị chặn nhầm (đây là nguyên nhân "bị chặn tìm
-                // kiếm"). Cờ chỉ thật sự reset khi trang đã tải xong hẳn (onPageFinished).
-                return !isInitiatedLoad
+                // Cho phép mở link bình thường - overlay quảng cáo bẫy click đã được
+                // AdOverlayBlocker xử lý rồi, không cần chặn 1 chạm nữa.
+                return false
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
