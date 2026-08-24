@@ -60,12 +60,57 @@ class MainActivity : AppCompatActivity() {
         // TRƯỚC ĐÂY hàm này CHỈ ẩn thanh trạng thái, CỐ Ý giữ nguyên thanh điều hướng hệ thống -
         // đã đổi lại theo yêu cầu (3 phím điều hướng Android vẫn lộ ra phá vỡ giao diện WP).
         //
+        // NGOẠI LỆ (mới): xem applySystemBarsForCurrentState() bên dưới - khi đang ở trang
+        // YouTube VÀ máy đang xoay dọc, KHÔNG gọi hàm này nữa, thay vào đó gọi showSystemBars()
+        // để luôn lộ ra cả thanh trạng thái lẫn 3 phím điều hướng, theo yêu cầu.
+        //
         // Dùng WindowInsetsControllerCompat của androidx để hoạt động đúng trên mọi phiên bản
         // Android (kể cả các máy Android cũ hơn không có API ẩn thanh điều hướng mới).
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.hide(WindowInsetsCompat.Type.systemBars())
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    /** Ngược lại với enableImmersiveMode(): hiện lại HẲN thanh trạng thái + 3 phím điều hướng hệ
+     *  thống (không phải kiểu "vuốt ra tạm" như BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, mà hiện
+     *  LUÔN LUÔN, chiếm chỗ thật trên màn hình) - dùng setDecorFitsSystemWindows(true) để hệ
+     *  thống tự chừa đúng khoảng trống cho 2 thanh này, tránh nội dung app bị che khuất sau
+     *  chúng trên các máy có notch/gesture bar khác nhau. */
+    private fun showSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.show(WindowInsetsCompat.Type.systemBars())
+    }
+
+    /** YÊU CẦU MỚI: khi đang xem YouTube VÀ máy đang cầm DỌC (portrait) -> LUÔN hiện thanh trạng
+     *  thái ở trên + 3 phím điều hướng ở dưới (showSystemBars()), không ẩn đi như chế độ toàn
+     *  màn hình mặc định của app nữa. Mọi trường hợp khác (đang ở trang khác không phải YouTube,
+     *  hoặc YouTube nhưng đang xoay NGANG để xem video toàn màn hình) vẫn giữ nguyên hành vi cũ:
+     *  ẩn hết 2 thanh này (enableImmersiveMode()).
+     *
+     *  Được gọi lại ở MỌI thời điểm trạng thái có thể đổi: xoay máy (onConfigurationChanged),
+     *  cửa sổ lấy lại focus (onWindowFocusChanged), trang web tải xong - đổi URL
+     *  (onPageFinished), và về lại màn hình Start (showHomeOverlay()). */
+    private fun applySystemBarsForCurrentState() {
+        val isPortrait = resources.configuration.orientation ==
+            android.content.res.Configuration.ORIENTATION_PORTRAIT
+        val isOnYoutubePage = ::webView.isInitialized &&
+            homeOverlay.visibility != View.VISIBLE &&
+            YoutubeAdSkipper.isYoutube(webView.url)
+        if (isPortrait && isOnYoutubePage) {
+            showSystemBars()
+        } else {
+            enableImmersiveMode()
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // MainActivity khai báo configChanges="orientation|..." trong Manifest (để không bị huỷ
+        // và dựng lại Activity mỗi lần xoay máy) -> phải TỰ cập nhật lại thanh trạng thái/điều
+        // hướng ở đây mỗi khi xoay, hệ thống không tự làm giúp trong trường hợp này.
+        applySystemBarsForCurrentState()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -94,7 +139,7 @@ class MainActivity : AppCompatActivity() {
             val imeVisible = androidx.core.view.ViewCompat
                 .getRootWindowInsets(window.decorView)
                 ?.isVisible(WindowInsetsCompat.Type.ime()) == true
-            if (!imeVisible) enableImmersiveMode()
+            if (!imeVisible) applySystemBarsForCurrentState()
         }
     }
 
@@ -288,6 +333,8 @@ class MainActivity : AppCompatActivity() {
         // findYoutubeSearchIndex() sẽ không còn tìm thấy trang tìm kiếm của phiên cũ nữa.
         if (::webView.isInitialized) webView.clearHistory()
         homeScreenManager.goToStart()
+        // Về Start -> không còn ở trang YouTube nữa -> ẩn lại 2 thanh hệ thống như mặc định.
+        applySystemBarsForCurrentState()
     }
 
     private val pauseRetryHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -748,6 +795,9 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 updateOffButtonVisibility(url)
+                // Đổi trang xong (có thể vừa vào/rời YouTube) -> cập nhật lại ngay thanh trạng
+                // thái/điều hướng hệ thống có nên hiện hay ẩn (xem applySystemBarsForCurrentState()).
+                applySystemBarsForCurrentState()
                 view?.evaluateJavascript(AdOverlayBlocker.JS, null)
                 if (YoutubeAdSkipper.isYoutube(url)) {
                     // AdOverlayBlocker KHÔNG chạy trên YouTube - nó dùng querySelectorAll('body *')
