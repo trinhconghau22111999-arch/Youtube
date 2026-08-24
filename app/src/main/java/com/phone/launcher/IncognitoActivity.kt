@@ -75,7 +75,7 @@ class IncognitoActivity : AppCompatActivity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xFF000000.toInt())
+            setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, R.color.app_bg))
         }
 
         val tabScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
