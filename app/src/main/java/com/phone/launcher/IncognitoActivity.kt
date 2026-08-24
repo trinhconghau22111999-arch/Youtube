@@ -71,17 +71,7 @@ class IncognitoActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
-        val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-        // Ẩn CẢ status bar LẪN thanh điều hướng hệ thống - xem giải thích đầy đủ ở
-        // UiUtils.hideStatusBar()/MainActivity.enableImmersiveMode(). ĐÃ GỠ HẲN thanh điều
-        // hướng nổi (WpNavBar/TaskView) theo yêu cầu - back dùng đúng cử chỉ/nút Back thật của
-        // hệ thống (BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE bên dưới cho phép vuốt mép để hiện
-        // tạm thanh hệ thống khi cần), vẫn được xử lý đầy đủ qua onBackPressed(); chuyển tab
-        // dùng thanh tab ngang (tabBar) có sẵn phía trên, không cần màn Đa nhiệm toàn màn hình.
-        insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-        insetsController.systemBarsBehavior =
-            androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        // Không ẩn status bar / navigation bar - hiển thị bình thường.
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -530,10 +520,7 @@ class IncognitoActivity : AppCompatActivity() {
             val imeVisible = androidx.core.view.ViewCompat
                 .getRootWindowInsets(window.decorView)
                 ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
-            if (!imeVisible) {
-                val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            }
+            // Không ẩn thanh hệ thống.
         }
     }
 
