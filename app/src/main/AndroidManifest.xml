@@ -41,13 +41,13 @@
             </intent-filter>
         </activity>
 
-        <!-- android:process=":incognito" - chạy ở TIẾN TRÌNH RIÊNG, WebView trong tiến trình này
-             tự động dùng thư mục dữ liệu (cookie, phiên đăng nhập...) RIÊNG BIỆT hoàn toàn với
-             trình duyệt chính, không cần code phức tạp để tự tách - đây là cách làm chuẩn của
-             Android cho việc cô lập dữ liệu WebView theo tiến trình. -->
+        <!-- KHÔNG còn android:process=":incognito" - IncognitoActivity giờ chạy CÙNG tiến trình
+             với MainActivity, chia sẻ chung cookie store của WebView -> đăng nhập ở "Duyệt web"
+             được GIỮ LẠI giữa các phiên, không mất khi thoát app. -->
         <activity android:name=".IncognitoActivity" android:exported="false"
-            android:process=":incognito"
-            android:resizeableActivity="false" />
+            android:resizeableActivity="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
