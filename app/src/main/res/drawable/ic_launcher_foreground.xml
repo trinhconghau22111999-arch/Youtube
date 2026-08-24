@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Lớp TRƯỚC icon app: vòng tròn viền trắng + 4 chấm tròn 2x2 ở giữa (thay cho 4 ô vuông cũ).
+     Chấm trên-trái = tia sét màu vàng trên nền trắng.
+     Chấm trên-phải = icon thu nhỏ YouTube (nền đỏ, tam giác Play trắng).
+     Chấm dưới-trái = icon thu nhỏ Duyệt web (nền tím-xanh, hình quyển sách trắng).
+     Chấm dưới-phải = dấu chấm hỏi màu đỏ trên nền trắng. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -12,10 +17,39 @@
         android:strokeWidth="3.5"
         android:pathData="M54,54m-34,0a34,34 0,1 1,68 0a34,34 0,1 1,-68 0" />
 
-    <!-- 4 ô vuông nhỏ 2x2 căn giữa -->
-    <path android:fillColor="#FFFFFF" android:pathData="M35,35h15v15h-15z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M58,35h15v15h-15z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M35,58h15v15h-15z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M58,58h15v15h-15z" />
+    <!-- Chấm tròn trên-trái: nền trắng + tia sét vàng -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M35,42.5 a7.5,7.5 0 1,0 15,0 a7.5,7.5 0 1,0 -15,0" />
+    <path android:fillColor="#FFC400"
+        android:pathData="M43.77,36.98 L39.95,42.92 L42.08,42.92 L41.23,48.02 L45.05,42.08 L42.92,42.08 Z" />
+
+    <!-- Chấm tròn dưới-phải: nền trắng + dấu chấm hỏi đỏ -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M58,65.5 a7.5,7.5 0 1,0 15,0 a7.5,7.5 0 1,0 -15,0" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#E53935"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M62.3,63.2 c0,-2.4 1.9,-4.2 4.2,-4.2 c2.1,0 3.7,1.5 3.7,3.5 c0,1.6 -1,2.4 -2,3.2 c-1,0.8 -1.9,1.5 -1.9,2.9" />
+    <path android:fillColor="#E53935"
+        android:pathData="M65.2,69.2 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" />
+
+    <!-- Chấm tròn trên-phải: icon nhỏ YouTube (nền đỏ #E51400 + tam giác Play trắng) -->
+    <path android:fillColor="#E51400"
+        android:pathData="M58,42.5 a7.5,7.5 0 1,0 15,0 a7.5,7.5 0 1,0 -15,0" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M62.5,38 L62.5,47 L70.5,42.5 Z" />
+
+    <!-- Chấm tròn dưới-trái: icon nhỏ Duyệt web (nền tím-xanh #4A4A9E + quyển sách trắng) -->
+    <path android:fillColor="#4A4A9E"
+        android:pathData="M35,65.5 a7.5,7.5 0 1,0 15,0 a7.5,7.5 0 1,0 -15,0" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M39.14,61.51 L39.14,69.07 Q39.14,69.49 39.56,69.49 L43.34,69.49 Q42.92,69.07 42.92,68.65 L42.92,61.93 Q42.92,61.51 42.5,61.51 Z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M43.34,61.93 Q43.34,61.51 43.76,61.51 L45.44,61.51 Q45.86,61.51 45.86,61.93 L45.86,68.65 Q45.86,69.07 45.44,69.49 L43.34,69.49 Q43.34,69.07 43.34,68.65 Z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M42.71,61.72 L43.13,61.72 L43.13,69.49 L42.71,69.49 Z" />
 
 </vector>
