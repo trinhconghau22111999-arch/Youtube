@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
@@ -205,24 +206,39 @@ object FloatingBackButton {
         fixed: Boolean = false,
         // [doubleTapOnly]: true = phải chạm 2 lần liên tiếp (double-tap) mới kích hoạt onTap,
         // chạm 1 lần không làm gì - tránh chạm nhầm khi nút nằm gần các vùng tương tác khác.
-        doubleTapOnly: Boolean = false
+        doubleTapOnly: Boolean = false,
+        // [iconColor]: màu icon + viền nút nổi. Mặc định null = tự động phát hiện theo theme hệ
+        // thống - SÁNG thì dùng màu TỐI (đen/xám đậm) để nổi bật trên nền trắng; TỐI thì dùng
+        // màu SÁNG (trắng) như trước. Truyền giá trị cụ thể để override hẳn (ví dụ luôn trắng).
+        iconColor: Int? = null
     ): Handle {
         fun dp(v: Int) = (v * activity.resources.displayMetrics.density).toInt()
         val size = dp(56)
         val fixedMargin = dp(12)
 
+        // Phát hiện theme hệ thống: Night mode = tối, ngược lại = sáng.
+        // Màu nút ĐẢO NGƯỢC so với nền: nền TỐI -> nút SÁNG (trắng); nền SÁNG -> nút TỐI (đen).
+        val resolvedIconColor = iconColor ?: run {
+            val nightMask = android.content.res.Configuration.UI_MODE_NIGHT_MASK
+            val isNightMode = (activity.resources.configuration.uiMode and nightMask) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            if (isNightMode) Color.WHITE else Color.BLACK
+        }
+        // Alpha viền giảm nhẹ (0xCC ≈ 80%) để không quá cứng, nhưng vẫn đủ thấy trên cả 2 nền.
+        val strokeColor = (resolvedIconColor and 0x00FFFFFF) or 0xCC000000.toInt()
+
         val btn = TextView(activity).apply {
             text = icon
             textSize = 24f
-            setTextColor(Color.WHITE)
+            setTextColor(resolvedIconColor)
             gravity = Gravity.CENTER
-            // Nút vòng tròn viền trắng, KHÔNG tô nền (chỉ viền mảnh) - đúng kiểu nút trên
-            // "Application Bar" (thanh lệnh) của Windows Phone/Windows 10 Mobile, thay cho
-            // hình tròn nền đen mờ kiểu iOS/Android trước đây.
+            // Nút vòng tròn viền màu động theo theme, KHÔNG tô nền (chỉ viền mảnh) - đúng kiểu
+            // nút trên "Application Bar" của Windows Phone/Windows 10 Mobile. Màu viền/icon tự
+            // đổi: theme SÁNG -> đen để nổi bật trên nền trắng, theme TỐI -> trắng như cũ.
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.TRANSPARENT)
-                setStroke(dp(2), 0xCCFFFFFF.toInt())
+                setStroke(dp(2), strokeColor)
             }
         }
 
@@ -432,3 +448,5 @@ object FloatingBackButton {
         return Handle(id, wm, btn, lp, root, resyncCallback, fixed)
     }
 }
+
+
