@@ -1003,6 +1003,34 @@ object YoutubeAdSkipper {
         (function() {
             if (window.__adSkipperRunning) return;
             window.__adSkipperRunning = true;
+
+            // Lưu lại tốc độ phát & trạng thái tắt tiếng do NGƯỜI DÙNG tự chọn (khác với tốc độ
+            // 30x/tắt tiếng do CHÍNH SCRIPT này ép tạm để tua nhanh qua quảng cáo bên dưới) - để
+            // khôi phục lại ĐÚNG Ý người dùng ngay khi quảng cáo vừa kết thúc. Không có bước này,
+            // video chính sẽ tự rơi về tốc độ mặc định 1x sau khi hết quảng cáo, dù người dùng đã
+            // chọn 2x từ trước đó (BUG đã gặp).
+            var userRate = null;
+            var userMuted = null;
+            var scriptChanging = false;
+            var lastAdShowing = false;
+
+            function attachListeners(video) {
+                if (!video || video.__adSkipperListenersAttached) return;
+                video.__adSkipperListenersAttached = true;
+                // Chỉ ghi nhận là "người dùng chọn" khi thay đổi KHÔNG PHẢI do chính script này
+                // gây ra (script luôn bật cờ scriptChanging=true trong lúc nó tự đổi rate/mute).
+                video.addEventListener('ratechange', function() {
+                    if (scriptChanging) return;
+                    userRate = video.playbackRate;
+                });
+                video.addEventListener('volumechange', function() {
+                    if (scriptChanging) return;
+                    userMuted = video.muted;
+                });
+                if (userRate === null) userRate = video.playbackRate;
+                if (userMuted === null) userMuted = video.muted;
+            }
+
             setInterval(function() {
                 try {
                     var skipBtn = document.querySelector(
@@ -1011,13 +1039,32 @@ object YoutubeAdSkipper {
                     if (skipBtn) { skipBtn.click(); }
 
                     var video = document.querySelector('video');
+                    attachListeners(video);
                     var adShowing = document.querySelector('.ad-showing, .ad-interrupting');
+
                     if (adShowing && video) {
+                        scriptChanging = true;
                         video.muted = true;
                         if (video.duration && isFinite(video.duration)) {
                             video.currentTime = video.duration;
                         }
                         video.playbackRate = 30;
+                        scriptChanging = false;
+                        lastAdShowing = true;
+                    } else if (lastAdShowing && video) {
+                        // Quảng cáo VỪA kết thúc (tick trước còn quảng cáo, tick này đã hết) ->
+                        // khôi phục lại đúng tốc độ phát & trạng thái tắt tiếng người dùng đã chọn
+                        // trước đó, vì YouTube tự reset về 1x/không tắt tiếng khi chuyển từ quảng
+                        // cáo sang video chính.
+                        scriptChanging = true;
+                        if (userRate !== null && video.playbackRate !== userRate) {
+                            video.playbackRate = userRate;
+                        }
+                        if (userMuted !== null && video.muted !== userMuted) {
+                            video.muted = userMuted;
+                        }
+                        scriptChanging = false;
+                        lastAdShowing = false;
                     }
 
                     var overlays = document.querySelectorAll(
