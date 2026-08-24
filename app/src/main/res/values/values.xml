@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Duyệt wed</string>
+    <string name="app_name">Chặn quảng cáo</string>
 
     <!-- ================= BẢNG MÀU WINDOWS PHONE / WINDOWS 10 MOBILE (METRO) =================
          Giữ tên biến "neon_purple" để KHÔNG phải sửa hàng chục chỗ tham chiếu R.color trong
