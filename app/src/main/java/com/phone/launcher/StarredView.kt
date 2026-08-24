@@ -173,7 +173,7 @@ object StarredView {
         // Map url -> row view để cập nhật trạng thái chọn
         val rowViews = mutableMapOf<String, View>()
 
-        fun updateActionBar(allUrls: List<String>) {
+        fun updateActionBar() {
             val count = selectedUrls.size
             if (count == 0) {
                 actionBar.visibility = View.GONE
@@ -262,7 +262,7 @@ object StarredView {
                 row.setOnLongClickListener {
                     if (selectedUrls.contains(url)) selectedUrls.remove(url)
                     else selectedUrls.add(url)
-                    updateActionBar(currentUrls)
+                    updateActionBar()
                     // Cập nhật dòng này
                     row.setBackgroundColor(
                         if (selectedUrls.contains(url)) 0xFF1A3A5C.toInt() else Color.TRANSPARENT
@@ -277,7 +277,7 @@ object StarredView {
                     if (selectedUrls.isNotEmpty()) {
                         if (selectedUrls.contains(url)) selectedUrls.remove(url)
                         else selectedUrls.add(url)
-                        updateActionBar(currentUrls)
+                        updateActionBar()
                         row.setBackgroundColor(
                             if (selectedUrls.contains(url)) 0xFF1A3A5C.toInt() else Color.TRANSPARENT
                         )
@@ -301,7 +301,7 @@ object StarredView {
                 listContainer.addView(rowDivider)
             }
 
-            updateActionBar(currentUrls)
+            updateActionBar()
         }
 
         // Gán action cho các nút
@@ -309,18 +309,18 @@ object StarredView {
 
         btnClearSelection.setOnClickListener {
             selectedUrls.clear()
-            updateActionBar(currentUrlsRef)
+            updateActionBar()
         }
 
         btnSelectAll.setOnClickListener {
             selectedUrls.addAll(currentUrlsRef)
-            updateActionBar(currentUrlsRef)
+            updateActionBar()
         }
 
         btnOpenSelected.setOnClickListener {
             val toOpen = selectedUrls.toList()
             selectedUrls.clear()
-            updateActionBar(currentUrlsRef)
+            updateActionBar()
             toOpen.forEach { onOpen(it) }
         }
 

@@ -989,8 +989,6 @@ object AdBlocker {
     fun blockedResponse(): WebResourceResponse {
         return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
     }
-
-    fun blockedCount(): Int = domains.size
 }
 
 /**

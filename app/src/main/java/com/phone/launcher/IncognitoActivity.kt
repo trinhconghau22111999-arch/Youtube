@@ -40,8 +40,8 @@ import androidx.core.content.ContextCompat
  *  tab này thì tab kia trong CÙNG phiên ẩn danh cũng thấy đã đăng nhập). */
 class IncognitoActivity : AppCompatActivity() {
 
-    /** Thoát màn này kèm hiệu ứng "trượt ra bên phải" kiểu Windows Phone (xem [finishWp] ở
-     *  UiUtils.kt), dù finish() được gọi từ đâu (nút Back nổi, mũi tên ◀, phím Back cứng...). */
+    /** Thoát màn này kèm hiệu ứng "trượt ra bên phải" kiểu Windows Phone, dù finish() được gọi
+     *  từ đâu (nút Back nổi, mũi tên ◀, phím Back cứng...). */
     override fun finish() {
         super.finish()
         @Suppress("DEPRECATION")
@@ -53,14 +53,10 @@ class IncognitoActivity : AppCompatActivity() {
 
     private val tabs = ArrayList<Tab>()
     private var activeIndex = 0
-    private var programmaticLoad = false
     // Màn hình gốc (chứa webContainer/tabBar) - lưu lại thành field để starredViewHandle có nơi
     // add overlay "đã gắn dấu" vào.
     private lateinit var overlayRoot: FrameLayout
     private var starredViewHandle: StarredView.Handle? = null
-    // Ẩn danh: theo dõi xem lần load hiện tại có phải do code khởi tạo không
-    // (true = load do code/newTab, false = load do user click link trong trang)
-    private var isInitiatedLoad = false
 
     private lateinit var tabBar: LinearLayout
     private lateinit var webContainer: FrameLayout
@@ -347,8 +343,6 @@ class IncognitoActivity : AppCompatActivity() {
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                // Reset flag (phòng trường hợp redirect chuỗi)
-                isInitiatedLoad = false
                 if (tabs.getOrNull(activeIndex)?.webView === webView) {
                     edtUrl.setText(if (url == null || url == "about:blank") "" else url)
                     refreshStarIcon()
@@ -369,7 +363,6 @@ class IncognitoActivity : AppCompatActivity() {
     }
 
     private fun loadInTab(index: Int, url: String) {
-        isInitiatedLoad = true
         tabs.getOrNull(index)?.webView?.loadUrl(url)
     }
 
@@ -498,7 +491,6 @@ class IncognitoActivity : AppCompatActivity() {
             input = if (input.contains(".") && !input.contains(" ")) "https://$input"
             else "https://www.google.com/search?q=" + Uri.encode(input)
         }
-        programmaticLoad = true
         loadInTab(activeIndex, input)
     }
 
@@ -507,21 +499,6 @@ class IncognitoActivity : AppCompatActivity() {
     // sạch, không để lại dấu vết gì khi thoát Ẩn danh).
     private fun saveSession() {
         IncognitoSessionStore.clear(this)
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        // FIX (giống MainActivity - xem giải thích đầy đủ 3 lần sửa ở
-        // MainActivity.onWindowFocusChanged()): nguyên nhân gốc là nút Back nổi (FloatingBackButton,
-        // đã sửa tận gốc bằng FLAG_NOT_FOCUSABLE) từng tranh giành input focus. Ở đây thêm lớp
-        // bảo vệ đáng tin cậy hơn việc đoán qua loại View: hỏi thẳng hệ thống bàn phím có đang
-        // hiển thị không, đúng cho mọi loại ô nhập (EditText, ô nhập trong WebView...).
-        if (hasFocus) {
-            val imeVisible = androidx.core.view.ViewCompat
-                .getRootWindowInsets(window.decorView)
-                ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
-            // Không ẩn thanh hệ thống.
-        }
     }
 
     override fun onBackPressed() {
@@ -533,8 +510,6 @@ class IncognitoActivity : AppCompatActivity() {
         }
         val current = tabs.getOrNull(activeIndex)?.webView
         if (current != null && current.canGoBack()) {
-            programmaticLoad = true
-            isInitiatedLoad = true
             current.goBack()
         } else {
             saveSession()
