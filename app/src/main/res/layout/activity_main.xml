@@ -4,22 +4,22 @@
     android:id="@+id/rootFrame"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/wp_black">
+    android:background="@color/app_bg">
 
 
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#000000" />
+        android:background="@color/app_bg" />
 
-    <!-- Màn hình chính (homeOverlay) nổi đè lên WebView - nền ĐEN ĐẶC theo yêu cầu (không còn
-         ảnh nền/wallpaper tuỳ chỉnh nữa). -->
+    <!-- Màn hình chính (homeOverlay) nổi đè lên WebView - nền đen theo theme hệ thống (tối = đen,
+         sáng = trắng/xám nhạt - xem values/colors.xml và values-night/values.xml). -->
     <FrameLayout
         android:id="@+id/homeOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#000000">
+        android:background="@color/app_bg">
 
     </FrameLayout>
 
