@@ -71,10 +71,10 @@ class IncognitoActivity : AppCompatActivity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(androidx.core.content.ContextCompat.getColor(this@IncognitoActivity, R.color.app_bg))
+            setBackgroundColor(android.graphics.Color.BLACK)
         }
 
-        val tabScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+        val tabScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; setBackgroundColor(android.graphics.Color.BLACK) }
         tabBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(8), dp(8), dp(8), dp(4))
@@ -85,13 +85,14 @@ class IncognitoActivity : AppCompatActivity() {
         val urlRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(android.graphics.Color.BLACK)
             setPadding(dp(10), dp(4), dp(10), dp(6))
         }
         edtUrl = EditText(this).apply {
             hint = "Hỏi google"
             setHintTextColor(0xFF888888.toInt())
             setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setBackgroundColor(android.graphics.Color.BLACK)
             setPadding(dp(12), dp(10), dp(12), dp(10))
             setSingleLine(true)
             // Khai báo rõ kiểu URL để bàn phím chắc chắn hiện nút "Đi/Enter" đúng hành vi -
@@ -419,7 +420,7 @@ class IncognitoActivity : AppCompatActivity() {
             val cell = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setBackgroundColor(if (i == activeIndex) 0xFF2A0033.toInt() else 0xFF141414.toInt())
+                setBackgroundColor(android.graphics.Color.BLACK)
                 setPadding(dp(12), dp(8), dp(8), dp(8))
                 val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 lp.marginEnd = dp(6)
@@ -430,7 +431,7 @@ class IncognitoActivity : AppCompatActivity() {
             cell.addView(TextView(this).apply {
                 text = tab.title
                 textSize = 12f
-                setTextColor(if (i == activeIndex) 0xFF0078D7.toInt() else 0xFFAAAAAA.toInt())
+                setTextColor(if (i == activeIndex) android.graphics.Color.WHITE else 0xFF888888.toInt())
             })
             cell.addView(ImageView(this).apply {
                 setImageResource(R.drawable.ic_wp_close)
@@ -447,7 +448,7 @@ class IncognitoActivity : AppCompatActivity() {
         tabBar.addView(TextView(this).apply {
             text = "+ Tab"
             textSize = 13f
-            setTextColor(0xFF0078D7.toInt())
+            setTextColor(android.graphics.Color.WHITE)
             setPadding(dp(12), dp(8), dp(12), dp(8))
             isClickable = true
             setOnClickListener { newTab("https://www.google.com") }
