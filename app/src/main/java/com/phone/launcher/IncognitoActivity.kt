@@ -196,7 +196,7 @@ class IncognitoActivity : AppCompatActivity() {
         } else {
             // Mở trang TRỐNG (nền đen), để người dùng tự gõ địa chỉ muốn vào, thanh địa chỉ
             // cũng để trống (không điền sẵn) - xem switchTab().
-            newTab("about:blank")
+            newTab("https://www.google.com")
         }
     }
 
@@ -456,7 +456,7 @@ class IncognitoActivity : AppCompatActivity() {
             setTextColor(0xFF0078D7.toInt())
             setPadding(dp(12), dp(8), dp(12), dp(8))
             isClickable = true
-            setOnClickListener { newTab("about:blank") }
+            setOnClickListener { newTab("https://www.google.com") }
         })
     }
 
