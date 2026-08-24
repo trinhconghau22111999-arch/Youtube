@@ -20,25 +20,24 @@ Daemon will be stopped at the end of the build
 > Task :app:packageDebugResources
 > Task :app:mergeDebugResources
 > Task :app:parseDebugLocalResources
+> Task :app:mapDebugSourceSetPaths
 > Task :app:checkDebugAarMetadata
 > Task :app:dataBindingGenBaseClassesDebug
-> Task :app:mapDebugSourceSetPaths
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:javaPreCompileDebug
+> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
 > Task :app:compressDebugAssets
-> Task :app:processDebugManifestForPackage
 > Task :app:desugarDebugFileDependencies
-> Task :app:mergeDebugStartupProfile
 > Task :app:processDebugResources
-> Task :app:mergeDebugJniLibFolders
 > Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugStartupProfile
 > Task :app:compileDebugKotlin
 > Task :app:mergeExtDexDebug
 
@@ -60,9 +59,10 @@ w: file:///home/runner/work/Youtube_wed-99/Youtube_wed-99/app/src/main/java/com/
 > Task :app:dexBuilderDebug
 > Task :app:mergeDebugGlobalSynthetics
 > Task :app:processDebugJavaRes
+> Task :app:mergeLibDexDebug
+> Task :app:mergeDebugJniLibFolders
 > Task :app:mergeDebugNativeLibs NO-SOURCE
 > Task :app:stripDebugDebugSymbols NO-SOURCE
-> Task :app:mergeLibDexDebug
 > Task :app:mergeProjectDexDebug
 > Task :app:mergeDebugJavaResource
 > Task :app:validateSigningDebug
@@ -72,7 +72,7 @@ w: file:///home/runner/work/Youtube_wed-99/Youtube_wed-99/app/src/main/java/com/
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 1m 40s
+BUILD SUCCESSFUL in 1m 32s
 38 actionable tasks: 38 executed
 
 === APK thực tế tìm thấy sau build (find app/build/outputs -iname '*.apk') ===
