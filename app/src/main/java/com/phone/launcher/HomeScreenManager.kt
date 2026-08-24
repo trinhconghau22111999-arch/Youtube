@@ -35,7 +35,7 @@ object ShortcutsRepository {
             "youtube", "YouTube", ShortcutType.WEB, "https://www.youtube.com", R.drawable.ic_shortcut_youtube
         ),
         "incognito" to ShortcutItem(
-            "incognito", "Ẩn danh", ShortcutType.ACTIVITY, "IncognitoActivity", R.drawable.ic_shortcut_incognito
+            "incognito", "Duyệt wed", ShortcutType.ACTIVITY, "IncognitoActivity", R.drawable.ic_shortcut_book
         )
     )
 }
