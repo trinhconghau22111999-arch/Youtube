@@ -91,6 +91,7 @@ class HomeScreenManager(
             // ĐÃ GỠ HẲN thanh điều hướng nổi (WpNavBar) - không còn chừa khoảng đáy lớn cho nó
             // nữa, chỉ cần padding an toàn nhỏ như các cạnh còn lại.
             setPadding(dp(20), dp(8), dp(20), dp(20))
+            isFillViewport = true
             overScrollMode = View.OVER_SCROLL_NEVER
         }
 
