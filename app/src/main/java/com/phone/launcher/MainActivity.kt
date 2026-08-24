@@ -823,6 +823,9 @@ class MainActivity : AppCompatActivity() {
     // onUserLeaveHint() phía trên) - để nhạc/video tiếp tục phát nền đúng như yêu cầu.
     override fun onPause() {
         super.onPause()
+        // Flush cookie xuống disk ngay khi app ra nền - tránh mất cookie nếu OS kill process
+        // trước khi Android kịp tự flush (mặc định Android flush lazy, không đảm bảo thời điểm).
+        android.webkit.CookieManager.getInstance().flush()
     }
 
     override fun onStop() {
@@ -896,7 +899,10 @@ class MainActivity : AppCompatActivity() {
 
     // Thoát app -> xoá sạch mọi dấu vết phiên làm việc
     override fun onDestroy() {
-        clearAllSessionData()
+        // KHÔNG xoá cookie/session khi thoát app - cookie phải được GIỮ LẠI để tài khoản
+        // YouTube/Google (và mọi trang web khác) vẫn còn đăng nhập lần sau mở app.
+        // clearAllSessionData() chỉ còn được gọi thủ công qua nút "Xoá dữ liệu" trong Settings.
+        // Chỉ dọn view/window để tránh leak (không liên quan đến session).
         floatingOffButtonHandle?.detach()
         FakeScreenOff.hide()
         super.onDestroy()
