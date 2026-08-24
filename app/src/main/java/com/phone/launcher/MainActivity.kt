@@ -261,21 +261,14 @@ class MainActivity : AppCompatActivity() {
         if (::homeScreenManager.isInitialized) homeScreenManager.refreshPages()
     }
 
-    /** Điều hướng "về nhà" - dùng ở bước cuối của doBack() khi hết lịch sử trang - LUÔN về Start
-     *  ([showHomeOverlay]), đúng quy tắc gốc "Trang Start là trang chính". */
-    private fun goHome() {
-        showHomeOverlay()
-    }
-
     private fun showHomeOverlay() {
         homeOverlay.visibility = View.VISIBLE
         toolbarUrl.visibility = View.GONE
         progressBar?.visibility = View.GONE
         pauseAllVideos()
-        // "Thoát ra là vào lại từ đầu": xoá sạch trang YouTube đang xem (nếu có) mỗi khi quay về
-        // Start - lần sau bấm YouTube lại sẽ tải trang MỚI HOÀN TOÀN, không phải trang cũ còn dở
-        // dang lúc trước, đúng cảm giác "khởi động lại" mỗi lần chọn app.
-        if (::webView.isInitialized) webView.loadUrl("about:blank")
+        // Chỉ còn gọi ĐÚNG 1 LẦN lúc mới mở app (onCreate) - "thoát khỏi app con là thoát HẲN
+        // app luôn" (xem doBack()/openShortcutByKey()) nên không còn tình huống "quay lại" màn
+        // Start giữa phiên nữa; webView lúc này vừa tạo, chưa tải gì nên không cần tự xoá thêm.
         homeScreenManager.goToStart()
     }
 
@@ -446,6 +439,13 @@ class MainActivity : AppCompatActivity() {
                 val intent = Intent(this, activityClass)
                 if (initialUrl != null) intent.putExtra("initial_url", initialUrl)
                 startActivityWp(intent)
+                // "Thoát khỏi app con là thoát HẲN app luôn" - MainActivity tự đóng NGAY sau khi
+                // mở Ẩn danh, để Ẩn danh là activity DUY NHẤT còn lại trong ngăn xếp; bấm Back
+                // thoát Ẩn danh (hết lịch sử trang, xem onBackPressed() ở IncognitoActivity) sẽ
+                // đóng LUÔN cả app - không còn quay lại được màn Start của MainActivity nữa. Lần
+                // sau mở lại app (từ icon ngoài màn hình) sẽ tạo MainActivity MỚI, về đúng Start
+                // sạch từ đầu.
+                finish()
             }
         }
     }
@@ -777,9 +777,8 @@ class MainActivity : AppCompatActivity() {
                 programmaticLoad = true
                 webView.goBack()
             }
-            homeOverlay.visibility != View.VISIBLE -> {
-                goHome()
-            }
+            // Hết lịch sử để lùi (hoặc đang ở sẵn Start) -> "thoát khỏi app con là thoát HẲN app
+            // luôn" theo yêu cầu - KHÔNG còn dừng lại ở màn Start trước, thoát thẳng.
             else -> {
                 super.onBackPressed()
             }
@@ -791,7 +790,7 @@ class MainActivity : AppCompatActivity() {
      *  nhảy thẳng về đúng trang đó (bỏ qua mọi trang con YouTube còn sót ở giữa: kênh, tìm
      *  kiếm, video khác đã xem...). Nếu TOÀN BỘ lịch sử phía trước đều là YouTube (vd. mở
      *  YouTube ngay từ trang chủ app, chưa từng duyệt trang nào khác trước đó) -> không còn gì
-     *  để lùi về nữa, coi như "ra khỏi YouTube" = về màn hình chính app. */
+     *  để lùi về nữa, "thoát khỏi YouTube" = thoát HẲN app luôn (không dừng ở Start). */
     private fun exitYoutube() {
         val list = webView.copyBackForwardList()
         val currentIndex = list.currentIndex
@@ -806,8 +805,6 @@ class MainActivity : AppCompatActivity() {
         if (targetIndex >= 0) {
             programmaticLoad = true
             webView.goBackOrForward(targetIndex - currentIndex)
-        } else if (homeOverlay.visibility != View.VISIBLE) {
-            goHome()
         } else {
             super.onBackPressed()
         }
