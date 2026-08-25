@@ -91,8 +91,7 @@ class MainActivity : AppCompatActivity() {
      *
      *  Được gọi lại ở MỌI thời điểm trạng thái có thể đổi: xoay máy (onConfigurationChanged),
      *  cửa sổ lấy lại focus (onWindowFocusChanged), trang web tải xong - đổi URL
-     *  (onPageFinished). (Trang Start đã bị ẩn hẳn theo yêu cầu mới nên showHomeOverlay() không
-     *  còn là 1 điểm gọi thực tế nữa, dù hàm này vẫn tự cập nhật đúng nếu có ai gọi lại.) */
+     *  (onPageFinished). */
     private fun applySystemBarsForCurrentState() {
         val isPortrait = resources.configuration.orientation ==
             android.content.res.Configuration.ORIENTATION_PORTRAIT
@@ -174,7 +173,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private var progressBar: ProgressBar? = null
     private lateinit var homeOverlay: View
-    private var edtHomeSearch: EditText? = null
     private lateinit var homeScreenManager: HomeScreenManager
 
     // Giữ TẠM yêu cầu quyền của trang web (camera/mic hoặc vị trí) trong lúc chờ người dùng trả
@@ -184,12 +182,6 @@ class MainActivity : AppCompatActivity() {
     private var pendingWebPermissionRequest: PermissionRequest? = null
     private var pendingGeoOrigin: String? = null
     private var pendingGeoCallback: android.webkit.GeolocationPermissions.Callback? = null
-    // RequestCode cho RecognizerIntent nhận dạng giọng nói (YouTube tìm kiếm bằng mic)
-    private val REQ_SPEECH = 201
-
-    // Đánh dấu điều hướng do chính app gọi (từ thanh địa chỉ / menu đề xuất / mở lại tab)
-    // để KHÔNG hỏi xác nhận, chỉ hỏi khi người dùng bấm link ngay trên trang.
-    private var programmaticLoad = false
 
     // Bấm nút "🖥 Bản máy tính" nổi -> ép trang HIỆN TẠI sang UA máy tính tới khi tắt lại.
 
@@ -252,7 +244,7 @@ class MainActivity : AppCompatActivity() {
         // NHẤN nằm sát cạnh trên màn hình, không bo góc, không đổ bóng - trước đây bị xoá hẳn
         // khỏi layout (progressBar = null cứng) nên lúc tải trang KHÔNG còn dấu hiệu gì cho biết
         // trang đang load, thiếu hẳn 1 chi tiết đặc trưng của trình duyệt WP thật. Dựng lại bằng
-        // code (giống cách AccountBrowserActivity/IncognitoActivity đã làm) để luôn lên đúng màu
+        // code (giống cách IncognitoActivity đã làm) để luôn lên đúng màu
         // nhấn người dùng vừa chọn ở Cài đặt, không cần build lại app.
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
@@ -267,7 +259,6 @@ class MainActivity : AppCompatActivity() {
             }
         )
         homeOverlay = findViewById(R.id.homeOverlay)
-        edtHomeSearch = null  // đã xoá khỏi layout
 
         // Khởi tạo màn hình chính - chỉ còn 2 icon cố định (YouTube, Ẩn danh)
         homeScreenManager = HomeScreenManager(
@@ -292,20 +283,10 @@ class MainActivity : AppCompatActivity() {
         // cử chỉ/nút Back thật của hệ thống, xem onBackPressed()/doBack().
         addFloatingOffButton()
 
-        edtHomeSearch?.setOnEditorActionListener { _, actionId, event ->
-            if (actionId == EditorInfo.IME_ACTION_GO ||
-                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER)) {
-                loadFromHomeSearch()
-                true
-            } else {
-                false
-            }
-        }
-
         // YÊU CẦU MỚI: ẨN HẲN trang Start (màn hình chọn YouTube/Duyệt web) - mỗi lần mở app vào
         // THẲNG YouTube luôn, không còn dừng ở Start nữa (homeOverlay vẫn được dựng ở trên,
-        // nhưng từ giờ KHÔNG còn nơi nào gọi showHomeOverlay() nữa - kể cả nhánh dự phòng khi
-        // crash cũng đã đổi sang vào lại YouTube, xem recreateWebViewAfterCrash()). Nếu Activity
+        // nhưng từ giờ không còn được hiện ra nữa - kể cả nhánh dự phòng khi crash cũng đã đổi
+        // sang vào lại YouTube, xem recreateWebViewAfterCrash()). Nếu Activity
         // được mở kèm extra "initial_url" (vd shortcut ngoài màn hình gắn sẵn 1 URL cụ thể) thì
         // ưu tiên dùng đúng URL đó; không có thì mặc định luôn vào thẳng trang chủ YouTube.
         val startUrl = intent.getStringExtra("initial_url") ?: "https://www.youtube.com"
@@ -359,23 +340,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** ĐANG KHÔNG CÒN ĐƯỢC GỌI Ở ĐÂU (theo yêu cầu "ẩn hẳn trang Start, mở app vào thẳng
-     *  YouTube") - giữ lại hàm này (không xoá code build màn Start ở initAfterUnlock()) để dễ
-     *  khôi phục lại sau nếu cần, không phải vì còn đang dùng. */
-    private fun showHomeOverlay() {
-        homeOverlay.visibility = View.VISIBLE
-        progressBar?.visibility = View.GONE
-        pauseAllVideos()
-        // XOÁ LỊCH SỬ WEBVIEW khi về màn hình chính: tránh lỗi "back từ YouTube lần 2 lại nhảy
-        // về trang tìm kiếm cũ" - vì lịch sử cũ (tìm kiếm, video...) vẫn còn sót trong WebView
-        // dù homeOverlay đang che kín phía trên. Khi người dùng vào YouTube lần tiếp theo,
-        // findYoutubeSearchIndex() sẽ không còn tìm thấy trang tìm kiếm của phiên cũ nữa.
-        if (::webView.isInitialized) webView.clearHistory()
-        homeScreenManager.goToStart()
-        // Về Start -> không còn ở trang YouTube nữa -> ẩn lại 2 thanh hệ thống như mặc định.
-        applySystemBarsForCurrentState()
-    }
-
     private val pauseRetryHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     /** Dừng phát TẤT CẢ thẻ <video> VÀ <audio> đang có trên trang hiện tại trong WebView (kể cả
@@ -404,18 +368,6 @@ class MainActivity : AppCompatActivity() {
         homeOverlay.visibility = View.GONE
         // Đã ẩn hẳn thanh địa chỉ dưới cùng theo yêu cầu - không hiện lại kể cả khi đang xem
         // trang web. Điều hướng dùng trang chủ (icon/tìm kiếm) + nút Back tròn nổi.
-    }
-
-    private fun loadFromHomeSearch() {
-        val search = edtHomeSearch ?: return
-        var input = search.text.toString().trim()
-        if (input.isEmpty()) return
-        if (!input.startsWith("http://") && !input.startsWith("https://")) {
-            input = if (input.contains(".") && !input.contains(" ")) "https://$input"
-            else "https://www.google.com/search?q=" + Uri.encode(input)
-        }
-        search.setText("")
-        navigateTo(input)
     }
 
     // ĐÃ XOÁ HẲN: chuyển đổi bản máy tính/di động (User-Agent tuỳ chỉnh) theo yêu cầu - WebView

@@ -21,8 +21,8 @@ import kotlin.math.abs
  *  hình. Chạm nhanh (không kéo) = [onTap] (mặc định dùng cho hành động Back). Giữ tay
  *  (long-press, không kéo) = [onLongPress] (dùng cho hành động Home/thoát) - mô phỏng đúng kiểu
  *  1 nút vật lý làm được nhiều việc của iPhone đời cũ, thay vì 2 nút Back+Home tách rời như
- *  trước. Dùng chung cho MainActivity / AccountBrowserActivity / IncognitoActivity / Accounts-
- *  Activity để khỏi lặp code nhiều lần.
+ *  trước. Dùng chung cho MainActivity (hiện đang dùng cho nút "Off" - xem addFloatingOffButton())
+ *  để khỏi lặp code nếu sau này có màn hình khác cũng cần loại nút nổi này.
  *
  *  2 CHẾ ĐỘ VỊ TRÍ (tham số [attach.fixed]):
  *  - fixed = false (mặc định, hành vi CŨ): KÉO được tới bất kỳ đâu bằng ngón tay, thả tay ra tự
@@ -33,7 +33,8 @@ import kotlin.math.abs
  *
  *  ĐỒNG BỘ VỊ TRÍ GIỮA CÁC MÀN HÌNH (đúng như 1 nút duy nhất): vị trí (cạnh trái/phải + %
  *  chiều cao) được LƯU VÀO SharedPreferences DÙNG CHUNG (đọc từ file chung, không phải bộ nhớ
- *  riêng của từng tiến trình - quan trọng vì mỗi hồ sơ "Nhiều tài khoản" chạy 1 process riêng)
+ *  riêng của từng tiến trình - quan trọng cho các tiến trình phụ nếu sau này app có thêm màn
+ *  hình nào chạy process riêng)
  *  mỗi khi thả tay. TRƯỚC ĐÂY: vị trí đã lưu chỉ được ĐỌC LẠI 1 LẦN DUY NHẤT lúc [attach] chạy
  *  (tức lúc Activity đó được TẠO MỚI - onCreate). Nếu người dùng chuyển qua màn hình khác rồi
  *  quay lại (ví dụ bấm Back hệ thống) mà Activity cũ KHÔNG bị huỷ/tạo lại (chỉ onResume), nút ở
@@ -69,9 +70,9 @@ object FloatingBackButton {
 
     // Các nút đang "sống" TRONG CÙNG TIẾN TRÌNH tự đăng ký ở đây khi attach() để, nếu có, cập
     // nhật NGAY LẬP TỨC cho nhau khi 1 nút bị kéo (không cần đợi màn kia onResume) - chỉ là hỗ
-    // trợ thêm cho trường hợp cùng process (MainActivity/IncognitoActivity/AccountsActivity);
-    // giữa các hồ sơ "Nhiều tài khoản" (khác process) thì bắt buộc phải đợi onResume đọc lại từ
-    // SharedPreferences như mô tả ở trên vì bộ nhớ trong không dùng chung được giữa các process.
+    // trợ thêm cho trường hợp cùng process; nếu sau này có màn hình nào chạy process RIÊNG thì
+    // màn đó bắt buộc phải đợi onResume đọc lại từ SharedPreferences như mô tả ở trên vì bộ nhớ
+    // trong không dùng chung được giữa các process.
     // MỖI [id] có danh sách callback riêng để nút Back kéo không làm nút Off (khác id) bị gọi
     // resync nhầm và ngược lại.
     private val liveResyncCallbacks = mutableMapOf<String, MutableList<() -> Unit>>()

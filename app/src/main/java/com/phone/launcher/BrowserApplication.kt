@@ -6,28 +6,27 @@ import android.os.Build
 import android.os.Process
 import android.webkit.WebView
 
-/** BẮT BUỘC phải có class này: trình duyệt chính (tiến trình mặc định), chế độ Ẩn danh (tiến
- *  trình ":incognito") VÀ 10 hồ sơ "Nhiều tài khoản" (tiến trình ":acct1".."acct10", xem
- *  AndroidManifest.xml) ĐỀU dùng WebView. Nếu 2 tiến trình của CÙNG 1 app dùng chung 1 thư mục
- *  dữ liệu WebView, Android sẽ ném lỗi ngay khi WebView thứ 2 khởi tạo (thường lộ ra đúng lúc
- *  WebView/CookieManager hoạt động nhiều nhất - ví dụ lúc đăng nhập Google):
- *  "WebView cannot be used from more than one process" - CRASH ngay lập tức. Gọi
- *  WebView.setDataDirectorySuffix() SỚM NHẤT có thể (ngay đầu Application.onCreate(), trước khi
- *  bất kỳ WebView/CookieManager nào được đụng tới trong tiến trình đó) để mỗi tiến trình có thư
- *  mục dữ liệu WebView riêng, không đụng nhau nữa.
- *  LƯU Ý: TRƯỚC ĐÂY chỉ xử lý riêng tiến trình ":incognito", QUÊN áp dụng cho ":acct1".."acct10"
- *  -> mỗi hồ sơ "Nhiều tài khoản" vẫn dùng CHUNG thư mục dữ liệu WebView với tiến trình chính
- *  -> crash ngay khi đăng nhập Google ở màn "Nhiều tài khoản". Nay xử lý CHUNG cho MỌI tiến
- *  trình phụ (bất kỳ tên nào có dấu ":"), dùng luôn phần sau dấu ":" làm suffix nên không cần
- *  liệt kê tay từng acct1..acct10. */
+/** Class Application chung của app. Đặt WebView.setDataDirectorySuffix() SỚM NHẤT có thể (ngay
+ *  đầu Application.onCreate(), trước khi bất kỳ WebView/CookieManager nào được đụng tới) để MỌI
+ *  tiến trình PHỤ (tên process có dấu ":") tự có thư mục dữ liệu WebView riêng, không đụng thư
+ *  mục của tiến trình chính - đây là điều BẮT BUỘC theo tài liệu Android nếu 2 tiến trình của
+ *  CÙNG 1 app dùng WebView, nếu không sẽ crash ngay khi WebView thứ 2 khởi tạo với lỗi
+ *  "WebView cannot be used from more than one process".
+ *
+ *  HIỆN TẠI trong bản này, IncognitoActivity chạy CHUNG tiến trình với MainActivity (không còn
+ *  android:process=":incognito" trong Manifest) và không còn Activity nào khác khai báo process
+ *  riêng - nên nhánh `if (!suffix.isNullOrEmpty())` dưới đây thực tế KHÔNG chạy (processName
+ *  không có dấu ":"). Cứ để nguyên logic này: nó không tốn chi phí gì đáng kể, và nếu sau này có
+ *  Activity nào cần chạy process riêng trở lại (ví dụ khôi phục lại chế độ Ẩn danh cách ly cookie
+ *  hoàn toàn), code này tự động bảo vệ đúng ngay mà không cần sửa gì thêm. */
 class BrowserApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val processName = currentProcessName()
-            // processName dạng "com.phone.launcher:acct3" / "...:incognito" - tiến trình
-            // CHÍNH không có dấu ":" nên bỏ qua (đã là mặc định, không cần suffix).
+            // processName dạng "com.phone.launcher:<tên process phụ>" - tiến trình CHÍNH không
+            // có dấu ":" nên bỏ qua (đã là mặc định, không cần suffix).
             val suffix = processName?.substringAfter(':', "")
             if (!suffix.isNullOrEmpty()) {
                 try {

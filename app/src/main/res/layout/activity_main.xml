@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Root là FrameLayout để FloatingNavBar có thể nổi tự do ở mọi vị trí -->
+<!-- Root là FrameLayout để nút tròn nổi (FloatingBackButton - dùng cho nút "Off" giả tắt màn
+     hình) có thể nổi tự do ở mọi vị trí -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/rootFrame"
     android:layout_width="match_parent"

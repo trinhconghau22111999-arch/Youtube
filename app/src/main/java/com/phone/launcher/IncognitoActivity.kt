@@ -30,12 +30,11 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
-/** Trình duyệt phụ "Duyệt web" - chạy ở TIẾN TRÌNH RIÊNG (xem android:process trong Manifest)
- *  nên cookie/phiên đăng nhập TÁCH BIỆT hoàn toàn khỏi trình duyệt chính (YouTube), không ảnh
- *  hưởng tài khoản đang đăng nhập ở đó.
+/** Trình duyệt phụ "Duyệt web" - CHẠY CHUNG TIẾN TRÌNH với MainActivity (xem AndroidManifest.xml:
+ *  đã bỏ android:process=":incognito"), nên CHIA SẺ CHUNG cookie/phiên đăng nhập với trình duyệt
+ *  chính - đăng nhập ở đây vẫn còn khi mở YouTube ở MainActivity và ngược lại.
  *  THOÁT RA: danh sách URL các tab được LƯU LẠI (qua IncognitoSessionStore) và KHÔI PHỤC khi
- *  vào lại - người dùng tiếp tục đúng các trang đang mở. Cookie/phiên đăng nhập trong process
- *  này KHÔNG được lưu (process bị kill khi thoát), nên sẽ cần đăng nhập lại trang yêu cầu xác thực.
+ *  vào lại - người dùng tiếp tục đúng các trang đang mở.
  *  DẤU SAO: lưu VĨNH VIỄN qua IncognitoStarredStore, không mất khi đóng phiên.
  *  KHÔNG giới hạn số tab; TẤT CẢ các tab dùng CHUNG 1 phiên/cookie với nhau trong cùng 1 lần mở. */
 class IncognitoActivity : AppCompatActivity() {
@@ -643,9 +642,8 @@ class IncognitoActivity : AppCompatActivity() {
         loadInTab(activeIndex, input)
     }
 
-    // ĐÚNG NGHĨA Ẩn danh: không lưu lại danh sách tab cho lần mở sau nữa (trước đây hàm này lưu
-    // URL các tab để khôi phục, giờ đảm bảo dữ liệu cũ - nếu còn sót từ bản trước - cũng bị xoá
-    // sạch, không để lại dấu vết gì khi thoát Ẩn danh).
+    // Lưu danh sách URL các tab hiện tại để khôi phục khi vào lại app (đúng như doc-comment
+    // đầu class: "Duyệt web" giờ nhớ lại phiên làm việc, không còn xoá sạch khi thoát nữa).
     private fun saveSession() {
         // Lưu danh sách URL các tab hiện tại để khôi phục khi vào lại app.
         // Tab đang hiển thị about:blank hoặc chưa load gì được lưu là chuỗi rỗng (sẽ bị lọc bỏ

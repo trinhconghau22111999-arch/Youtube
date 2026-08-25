@@ -20,7 +20,7 @@ import java.util.Calendar
 
 /** Màn hình "giả tắt" - bấm nút Off nổi lúc đang xem video (Youtube...) sẽ phủ 1 lớp ĐEN TOÀN
  *  MÀN HÌNH lên trên mọi thứ, ở giữa chỉ hiện đồng hồ giờ:phút + thứ,ngày/tháng/năm giống hệt
- *  kiểu đồng hồ ở màn hình chính (xem MainActivity.buildDraggableClock) - nhìn như điện thoại
+ *  kiểu đồng hồ hiển thị giờ:phút to + thứ,ngày/tháng/năm nhỏ bên dưới - nhìn như điện thoại
  *  đã tắt màn hình thật (kiểu màn khoá), NHƯNG video/nhạc phía dưới (WebView) vẫn tiếp tục phát
  *  bình thường vì đây chỉ là 1 lớp phủ hình ảnh, không thật sự tắt gì cả.
  *
@@ -163,7 +163,7 @@ object FakeScreenOff {
         clockLayout.addView(tvTime)
         clockLayout.addView(tvDate)
 
-        // Cập nhật đồng hồ mỗi giây, y hệt cách làm ở buildDraggableClock trong MainActivity.
+        // Cập nhật đồng hồ mỗi giây.
         val handler = Handler(Looper.getMainLooper())
         val updateClock = object : Runnable {
             override fun run() {
