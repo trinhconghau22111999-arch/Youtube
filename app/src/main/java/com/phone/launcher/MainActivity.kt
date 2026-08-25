@@ -91,7 +91,8 @@ class MainActivity : AppCompatActivity() {
      *
      *  Được gọi lại ở MỌI thời điểm trạng thái có thể đổi: xoay máy (onConfigurationChanged),
      *  cửa sổ lấy lại focus (onWindowFocusChanged), trang web tải xong - đổi URL
-     *  (onPageFinished), và về lại màn hình Start (showHomeOverlay()). */
+     *  (onPageFinished). (Trang Start đã bị ẩn hẳn theo yêu cầu mới nên showHomeOverlay() không
+     *  còn là 1 điểm gọi thực tế nữa, dù hàm này vẫn tự cập nhật đúng nếu có ai gọi lại.) */
     private fun applySystemBarsForCurrentState() {
         val isPortrait = resources.configuration.orientation ==
             android.content.res.Configuration.ORIENTATION_PORTRAIT
@@ -298,10 +299,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        showHomeOverlay()
-        // Nếu Activity được mở kèm extra "initial_url" (vd shortcut YouTube + Ẩn danh), điều
-        // hướng thẳng qua navigateTo() thay vì dừng ở Start (hàm này tự ẩn homeOverlay giúp).
-        intent.getStringExtra("initial_url")?.let { url -> navigateTo(url) }
+        // YÊU CẦU MỚI: ẨN HẲN trang Start (màn hình chọn YouTube/Duyệt web) - mỗi lần mở app vào
+        // THẲNG YouTube luôn, không còn dừng ở Start nữa (homeOverlay vẫn được dựng ở trên,
+        // nhưng từ giờ KHÔNG còn nơi nào gọi showHomeOverlay() nữa - kể cả nhánh dự phòng khi
+        // crash cũng đã đổi sang vào lại YouTube, xem recreateWebViewAfterCrash()). Nếu Activity
+        // được mở kèm extra "initial_url" (vd shortcut ngoài màn hình gắn sẵn 1 URL cụ thể) thì
+        // ưu tiên dùng đúng URL đó; không có thì mặc định luôn vào thẳng trang chủ YouTube.
+        val startUrl = intent.getStringExtra("initial_url") ?: "https://www.youtube.com"
+        navigateTo(startUrl)
     }
 
     override fun onResume() {
@@ -345,11 +350,15 @@ class MainActivity : AppCompatActivity() {
             // Đang xem 1 trang (không phải màn hình Start) lúc crash -> tải lại đúng trang đó.
             navigateTo(crashedUrl)
         } else {
-            // Đang ở Start hoặc không rõ trang đang xem -> quay về Start cho an toàn.
-            showHomeOverlay()
+            // Không rõ trang đang xem (hiếm khi xảy ra) -> Start đã bị ẩn hẳn theo yêu cầu, vào
+            // thẳng lại trang chủ YouTube cho an toàn thay vì hiện Start.
+            navigateTo("https://www.youtube.com")
         }
     }
 
+    /** ĐANG KHÔNG CÒN ĐƯỢC GỌI Ở ĐÂU (theo yêu cầu "ẩn hẳn trang Start, mở app vào thẳng
+     *  YouTube") - giữ lại hàm này (không xoá code build màn Start ở initAfterUnlock()) để dễ
+     *  khôi phục lại sau nếu cần, không phải vì còn đang dùng. */
     private fun showHomeOverlay() {
         homeOverlay.visibility = View.VISIBLE
         progressBar?.visibility = View.GONE
