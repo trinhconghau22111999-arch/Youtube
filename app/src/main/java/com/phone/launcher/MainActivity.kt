@@ -834,6 +834,13 @@ class MainActivity : AppCompatActivity() {
                 // Đổi trang xong (có thể vừa vào/rời YouTube) -> cập nhật lại ngay thanh trạng
                 // thái/điều hướng hệ thống có nên hiện hay ẩn (xem applySystemBarsForCurrentState()).
                 applySystemBarsForCurrentState()
+                // XOÁ LỊCH SỬ ngay khi trang chủ YouTube load xong: dù người dùng về đây bằng
+                // cách nào (back từ video, back từ tìm kiếm, hay tự gõ URL...) thì đến trang chủ
+                // là lịch sử bị xoá sạch ngay lập tức - không còn trang tìm kiếm/video nào có
+                // thể quay lại được nữa kể cả khi vào Lịch sử/Đã lưu rồi back nhiều lần.
+                if (YoutubeAdSkipper.isYoutubeHome(url)) {
+                    view?.post { webView.clearHistory() }
+                }
                 view?.evaluateJavascript(AdOverlayBlocker.JS, null)
                 if (YoutubeAdSkipper.isYoutube(url)) {
                     // AdOverlayBlocker KHÔNG chạy trên YouTube - nó dùng querySelectorAll('body *')
