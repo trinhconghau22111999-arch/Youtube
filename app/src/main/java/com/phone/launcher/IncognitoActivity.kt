@@ -66,6 +66,16 @@ class IncognitoActivity : AppCompatActivity() {
     private lateinit var overlayRoot: FrameLayout
     private var starredViewHandle: StarredView.Handle? = null
 
+    // FIX "xem video trong Duyệt web không mở được toàn màn hình": trước đây WebChromeClient
+    // KHÔNG hề override onShowCustomView()/onHideCustomView() - đây là 2 hàm BẮT BUỘC phải có để
+    // WebView xử lý video HTML5 toàn màn hình (nút toàn màn hình trên trình phát video, hoặc
+    // Fullscreen API của trang). Thiếu 2 hàm này, WebView không có nơi nào để đặt View toàn màn
+    // hình của video vào -> bấm nút toàn màn hình không có tác dụng gì (im lặng, không lỗi, không
+    // phản hồi). fullscreenContainer là nơi chứa View đó khi đang toàn màn hình.
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+    private lateinit var fullscreenContainer: FrameLayout
+
     private lateinit var tabBar: LinearLayout
     private lateinit var webContainer: FrameLayout
     private lateinit var edtUrl: EditText
@@ -174,6 +184,15 @@ class IncognitoActivity : AppCompatActivity() {
             addView(root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
         overlayRoot = outer
+        // Container riêng cho video toàn màn hình (xem onShowCustomView/onHideCustomView bên
+        // dưới) - thêm SAU "root" trong cùng FrameLayout "outer" nên tự động NẰM ĐÈ LÊN TRÊN toàn
+        // bộ giao diện Duyệt web (thanh tab, thanh địa chỉ...) khi hiện ra, không cần ẩn "root"
+        // đi. Mặc định GONE, chỉ hiện khi có video toàn màn hình đang phát.
+        fullscreenContainer = FrameLayout(this).apply {
+            setBackgroundColor(android.graphics.Color.BLACK)
+            visibility = View.GONE
+        }
+        outer.addView(fullscreenContainer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(outer)
         // FIX khoảng đen dư ở trên/dưới màn hình - xem giải thích chi tiết trong MainActivity.kt.
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(outer) { v, insets ->
@@ -207,6 +226,25 @@ class IncognitoActivity : AppCompatActivity() {
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    /** Ẩn thanh trạng thái + thanh điều hướng hệ thống trong lúc video đang toàn màn hình - đúng
+     *  hành vi toàn màn hình thật sự (không phải chỉ full khung WebView mà vẫn còn 2 thanh hệ
+     *  thống che 1 phần). Bình thường (không xem video toàn màn hình) trang KHÔNG ẩn 2 thanh này
+     *  (xem comment ở onCreate: "Không ẩn status bar / navigation bar - hiển thị bình thường") -
+     *  chỉ ẩn tạm trong lúc xem toàn màn hình rồi trả lại y nguyên khi thoát. */
+    private fun enterFullscreenImmersive() {
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior =
+            androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    private fun exitFullscreenImmersive() {
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
+        val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+    }
 
     // ĐÃ GỠ HẲN thanh điều hướng nổi Back/Start/Đa nhiệm (WpNavBar) và màn "Đa nhiệm" toàn màn
     // hình (TaskView) theo yêu cầu. Back giờ dùng đúng cử chỉ/nút Back thật của hệ thống (vẫn xử
@@ -312,6 +350,39 @@ class IncognitoActivity : AppCompatActivity() {
                 }
             }
             override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: android.os.Message?): Boolean = false
+
+            // Xem giải thích đầy đủ ở khai báo customView/fullscreenContainer phía trên. Được
+            // WebView tự gọi khi trang yêu cầu hiện video (hoặc bất kỳ phần tử nào) toàn màn hình
+            // (nút toàn màn hình trên trình phát video, hoặc Element.requestFullscreen() của
+            // trang). [view] chính là nội dung cần hiện toàn màn hình (với video, thường là 1
+            // VideoView/TextureView do chính WebView tự dựng).
+            override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                if (view == null) return
+                if (customView != null) {
+                    // Đã có 1 customView khác đang hiện rồi (hiếm khi xảy ra) - báo hệ thống coi
+                    // như huỷ ngay yêu cầu MỚI này, giữ nguyên cái đang hiện, tránh chồng 2 lớp.
+                    callback?.onCustomViewHidden()
+                    return
+                }
+                customView = view
+                customViewCallback = callback
+                fullscreenContainer.addView(
+                    view,
+                    FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                )
+                fullscreenContainer.visibility = View.VISIBLE
+                enterFullscreenImmersive()
+            }
+
+            override fun onHideCustomView() {
+                val cv = customView ?: return
+                fullscreenContainer.removeView(cv)
+                fullscreenContainer.visibility = View.GONE
+                customView = null
+                customViewCallback?.onCustomViewHidden()
+                customViewCallback = null
+                exitFullscreenImmersive()
+            }
 
             // FIX (lý do "bấm mở mic là tắt liền"): trước đây CẤP LUÔN mọi quyền WebView yêu
             // cầu mà không kiểm tra quyền HỆ THỐNG (RECORD_AUDIO/CAMERA) có thực sự đã được
@@ -584,6 +655,12 @@ class IncognitoActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
+        // Đang xem video toàn màn hình -> Back chỉ thoát toàn màn hình (đúng hành vi chuẩn của
+        // trình duyệt), KHÔNG lùi trang/thoát Ẩn danh.
+        if (customView != null) {
+            tabs.getOrNull(activeIndex)?.webView?.webChromeClient?.onHideCustomView()
+            return
+        }
         // Đang mở màn "đã gắn dấu" -> Back chỉ ĐÓNG màn đó, KHÔNG lùi trang/thoát Ẩn danh.
         val sv = starredViewHandle
         if (sv != null && sv.isShowing) {
@@ -607,6 +684,12 @@ class IncognitoActivity : AppCompatActivity() {
         saveSession()
         pauseAllVideosInAllTabs()
         for (t in tabs) t.webView.onPause()
+        // Rời app trong lúc đang xem video toàn màn hình -> tự thoát toàn màn hình luôn, tránh
+        // quay lại app mà vẫn kẹt ở trạng thái toàn màn hình cũ (customViewCallback của trang có
+        // thể đã không còn hợp lệ sau khi WebView.onPause()/rời app).
+        if (customView != null) {
+            tabs.getOrNull(activeIndex)?.webView?.webChromeClient?.onHideCustomView()
+        }
     }
 
     override fun onResume() {
