@@ -184,6 +184,9 @@ class MainActivity : AppCompatActivity() {
     private var pendingWebPermissionRequest: PermissionRequest? = null
     private var pendingGeoOrigin: String? = null
     private var pendingGeoCallback: android.webkit.GeolocationPermissions.Callback? = null
+    // Callback chờ kết quả nhận dạng giọng nói (YouTube tìm kiếm bằng mic) - lưu tạm trong lúc
+    // RecognizerIntent đang chạy, nhận kết quả về ở onActivityResult rồi điền vào WebView.
+    private var pendingSpeechCallback: android.webkit.SpeechRecognitionCallback? = null
 
     // Đánh dấu điều hướng do chính app gọi (từ thanh địa chỉ / menu đề xuất / mở lại tab)
     // để KHÔNG hỏi xác nhận, chỉ hỏi khi người dùng bấm link ngay trên trang.
@@ -218,6 +221,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val REQ_PERMISSIONS = 101
+        const val REQ_SPEECH = 201
         const val DOWNLOAD_FOLDER = "AdBlockBrowser"
     }
 
@@ -467,6 +471,16 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        // Kết quả nhận dạng giọng nói từ RecognizerIntent (YouTube bấm icon mic tìm kiếm):
+        // lấy văn bản nhận dạng được rồi trả về cho WebView qua SpeechRecognitionCallback.
+        if (requestCode == REQ_SPEECH) {
+            val results = if (resultCode == RESULT_OK && data != null) {
+                data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+                    ?.map { it } ?: emptyList()
+            } else emptyList()
+            pendingSpeechCallback?.speechRecognitionResult(results)
+            pendingSpeechCallback = null
+        }
     }
 
     // Kết quả hộp thoại xin quyền HỆ THỐNG vừa bật lên ĐÚNG LÚC trang web cần (camera/mic/vị
@@ -604,6 +618,29 @@ class MainActivity : AppCompatActivity() {
         // Cho phép trang web (Google Maps...) xin vị trí thật của máy - mặc định WebView chặn
         // hoàn toàn API định vị của trình duyệt (navigator.geolocation) nếu không bật dòng này.
         webView.settings.setGeolocationEnabled(true)
+
+        // Bắt sự kiện YouTube (hoặc bất kỳ trang nào) yêu cầu nhận dạng giọng nói qua Web Speech
+        // API (webkitSpeechRecognition) - WebView mặc định KHÔNG có bridge này nên im lặng, người
+        // dùng bấm icon mic không có gì xảy ra. Override bằng cách launch RecognizerIntent của
+        // Android (hệ thống nhận dạng giọng nói chính thức), lấy kết quả rồi trả về cho trang web.
+        webView.setSpeechRecognitionCallback { callback ->
+            pendingSpeechCallback = callback
+            try {
+                val intent = android.speech.RecognizerIntent.getVoiceDetailsIntent(this)
+                    ?: android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                            android.speech.RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+                        putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+                        putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Tìm kiếm trên YouTube")
+                    }
+                @Suppress("DEPRECATION")
+                startActivityForResult(intent, REQ_SPEECH)
+            } catch (e: Exception) {
+                // Máy không có app nhận dạng giọng nói (hiếm) -> trả về rỗng để YouTube tự xử lý
+                pendingSpeechCallback?.speechRecognitionResult(emptyList())
+                pendingSpeechCallback = null
+            }
+        }
 
         webView.addJavascriptInterface(VideoDownloadBridge(), "AndroidDownloader")
 
