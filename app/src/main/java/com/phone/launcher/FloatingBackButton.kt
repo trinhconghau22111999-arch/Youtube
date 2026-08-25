@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.Gravity
@@ -181,10 +182,22 @@ object FloatingBackButton {
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
             val color = if (isNightMode) Color.WHITE else Color.BLACK
             val strokeColor = (color and 0x00FFFFFF) or 0xCC000000.toInt()
+            val strokeWidthPx = (2 * activity.resources.displayMetrics.density).toInt()
             (btn as? TextView)?.setTextColor(color)
-            (btn.background as? GradientDrawable)?.setStroke(
-                (2 * activity.resources.displayMetrics.density).toInt(), strokeColor
-            )
+            when (val bg = btn.background) {
+                // Icon chữ Unicode (kiểu cũ, vd nút Back "◁"): chỉ 1 lớp GradientDrawable OVAL
+                // làm viền tròn.
+                is GradientDrawable -> bg.setStroke(strokeWidthPx, strokeColor)
+                // Icon HÌNH VẼ cố định (kiểu mới, vd nút Off - xem [buildFixedRectangleIconDrawable]
+                // ở attach()): 2 lớp xếp chồng (viền tròn ngoài + hình chữ nhật trong), cả 2 đều
+                // cần đổi màu theo theme, không chỉ lớp ngoài.
+                is LayerDrawable -> {
+                    for (i in 0 until bg.numberOfLayers) {
+                        (bg.getDrawable(i) as? GradientDrawable)?.setStroke(strokeWidthPx, strokeColor)
+                    }
+                }
+                else -> {}
+            }
         }
 
         fun detach() {
@@ -193,6 +206,39 @@ object FloatingBackButton {
                 wm.removeViewImmediate(btn)
             } catch (e: Exception) {
             }
+        }
+    }
+
+    /** Vẽ icon "hình chữ nhật viền mảnh nằm giữa vòng tròn" bằng GradientDrawable (2 lớp xếp
+     *  chồng qua LayerDrawable: lớp ngoài là vòng tròn viền = viền nút vốn đã có từ trước, lớp
+     *  trong là hình chữ nhật viền nhỏ hơn nằm giữa) - dùng thay cho icon chữ Unicode (vd "⏻")
+     *  để KHÔNG phụ thuộc font hệ thống của từng máy (xem giải thích đầy đủ ở tham số
+     *  [useRectangleIcon] của [attach]). Chỉ vẽ VIỀN (không tô đặc) cho cả 2 lớp, giữ đúng cảm
+     *  giác "Metro phẳng" nhất quán với icon chữ kiểu cũ.
+     *  [strokeWidthPx]: độ dày viền, dùng chung cho cả vòng tròn ngoài lẫn chữ nhật trong.
+     *  [buttonSizePx]: kích thước nút (hình vuông), dùng để tính kích thước + độ thụt vào của
+     *  hình chữ nhật sao cho luôn nằm giữa, cân đối với vòng tròn ngoài. */
+    private fun buildFixedRectangleIconDrawable(
+        strokeWidthPx: Int,
+        buttonSizePx: Int,
+        iconColor: Int,
+        ringStrokeColor: Int
+    ): LayerDrawable {
+        val ring = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.TRANSPARENT)
+            setStroke(strokeWidthPx, ringStrokeColor)
+        }
+        val rect = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.TRANSPARENT)
+            setStroke(strokeWidthPx, iconColor)
+        }
+        // Hình chữ nhật chiếm khoảng 40% kích thước nút, thụt đều 4 cạnh để tự nằm giữa vòng
+        // tròn - không cần tính lại nếu kích thước nút [size] đổi sau này (luôn theo tỉ lệ %).
+        val inset = (buttonSizePx * 0.3f).toInt()
+        return LayerDrawable(arrayOf(ring, rect)).apply {
+            setLayerInset(1, inset, inset, inset, inset)
         }
     }
 
@@ -207,8 +253,18 @@ object FloatingBackButton {
         // giữ đúng key vị trí đã lưu từ trước. Nút mới (vd nút "Off" giả tắt màn hình) truyền
         // id khác, ví dụ "off".
         id: String = "back",
-        // Icon hiển thị trên nút - mặc định mũi tên lùi trang giống nút Back gốc.
+        // Icon hiển thị trên nút - mặc định mũi tên lùi trang giống nút Back gốc. BỎ QUA hoàn
+        // toàn nếu [useRectangleIcon] = true (xem tham số đó).
         icon: String = "◁",
+        // MỚI: true = vẽ 1 hình chữ nhật viền mảnh CỐ ĐỊNH ở giữa nút thay vì dùng ký tự
+        // Unicode làm icon (bỏ qua tham số [icon] ở trên). Ký tự Unicode như "⏻" (nút Off giả
+        // tắt màn hình) phụ thuộc vào FONT HỆ THỐNG của từng máy để vẽ - nhiều máy (đặc biệt
+        // dòng Trung Quốc/MIUI, hoặc bản Android rút gọn) THIẾU đúng font có ký tự này, hiển thị
+        // sai lệch tuỳ máy: có máy ra đúng hình, có máy ra 1 ô vuông có dấu X bên trong ("tofu",
+        // ký hiệu chuẩn cho "không tìm thấy glyph"), có máy không hiện GÌ CẢ. Vẽ hình chữ nhật
+        // bằng GradientDrawable (xem [buildFixedRectangleIconDrawable] bên dưới) thay vì dựa vào
+        // font chữ - LUÔN ra đúng 1 hình y hệt nhau trên MỌI máy, không phụ thuộc font.
+        useRectangleIcon: Boolean = false,
         // Vị trí mặc định LẦN ĐẦU (trước khi người dùng tự kéo đi chỗ khác, chỉ áp dụng khi
         // [fixed] = false) - cho nút mới xuất hiện ở 1 vị trí khác nút Back để 2 nút không đè
         // lên nhau ngay từ đầu. Khi [fixed] = true, [defaultIsRight] quyết định LUÔN LUÔN là
@@ -248,17 +304,23 @@ object FloatingBackButton {
         val strokeColor = (resolvedIconColor and 0x00FFFFFF) or 0xCC000000.toInt()
 
         val btn = TextView(activity).apply {
-            text = icon
-            textSize = 24f
-            setTextColor(resolvedIconColor)
             gravity = Gravity.CENTER
-            // Nút vòng tròn viền màu động theo theme, KHÔNG tô nền (chỉ viền mảnh) - đúng kiểu
-            // nút trên "Application Bar" của Windows Phone/Windows 10 Mobile. Màu viền/icon tự
-            // đổi: theme SÁNG -> đen để nổi bật trên nền trắng, theme TỐI -> trắng như cũ.
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.TRANSPARENT)
-                setStroke(dp(2), strokeColor)
+            if (useRectangleIcon) {
+                // Không set text - toàn bộ icon vẽ trong background (xem dưới), không phụ thuộc
+                // font hệ thống nên luôn ra đúng 1 hình giống hệt nhau trên mọi máy.
+                background = buildFixedRectangleIconDrawable(dp(2), size, resolvedIconColor, strokeColor)
+            } else {
+                text = icon
+                textSize = 24f
+                setTextColor(resolvedIconColor)
+                // Nút vòng tròn viền màu động theo theme, KHÔNG tô nền (chỉ viền mảnh) - đúng kiểu
+                // nút trên "Application Bar" của Windows Phone/Windows 10 Mobile. Màu viền/icon tự
+                // đổi: theme SÁNG -> đen để nổi bật trên nền trắng, theme TỐI -> trắng như cũ.
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.TRANSPARENT)
+                    setStroke(dp(2), strokeColor)
+                }
             }
         }
 

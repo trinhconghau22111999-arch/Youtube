@@ -1094,7 +1094,11 @@ class MainActivity : AppCompatActivity() {
                 applySystemBarsForCurrentState()
             },
             id = "off",
-            icon = "⏻",
+            // ĐÃ ĐỔI từ icon chữ Unicode "⏻" sang hình vẽ cố định (useRectangleIcon) - ký tự "⏻"
+            // hiển thị KHÔNG ổn định giữa các máy do phụ thuộc font hệ thống (có máy ra đúng
+            // hình, có máy ra ô vuông dấu X ("tofu"), có máy không hiện gì) - xem giải thích đầy
+            // đủ ở tham số [useRectangleIcon] trong FloatingBackButton.attach().
+            useRectangleIcon = true,
             defaultIsRight = false,
             defaultYFraction = 0.7f,
             fixed = false,
