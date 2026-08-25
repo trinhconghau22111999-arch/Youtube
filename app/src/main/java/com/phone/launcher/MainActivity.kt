@@ -941,8 +941,13 @@ class MainActivity : AppCompatActivity() {
                 programmaticLoad = true
                 webView.goBack()
             }
-            // Hết lịch sử để lùi (hoặc đang ở sẵn Start) -> "thoát khỏi app con là thoát HẲN app
-            // luôn" theo yêu cầu - KHÔNG còn dừng lại ở màn Start trước, thoát thẳng.
+            // Vẫn đang ở YouTube nhưng hết lịch sử (vd. sau clearHistory() ở trang chủ) ->
+            // load lại trang chủ YouTube thay vì thoát app, tránh "back 1 lần nữa là văng app".
+            YoutubeAdSkipper.isYoutube(currentUrl) -> {
+                programmaticLoad = true
+                webView.loadUrl("https://www.youtube.com")
+            }
+            // Hết lịch sử, không ở YouTube -> thoát app.
             else -> {
                 super.onBackPressed()
             }
