@@ -947,9 +947,14 @@ class MainActivity : AppCompatActivity() {
                 break
             }
         }
+        // XOÁ LỊCH SỬ YouTube ngay khi thoát khỏi YouTube (về trang chủ app hoặc thoát app):
+        // tránh lỗi "vào lịch sử/đã lưu xem video, back vài lần lại về trang tìm kiếm cũ" -
+        // vì trang tìm kiếm vẫn còn sót trong back-forward list dù người dùng đã về trang chủ
+        // YouTube rồi back thêm 1 lần. Xoá ngay tại đây để lần vào YouTube kế tiếp bắt đầu sạch.
+        webView.clearHistory()
         if (targetIndex >= 0) {
             programmaticLoad = true
-            webView.goBackOrForward(targetIndex - currentIndex)
+            webView.loadUrl(list.getItemAtIndex(targetIndex)?.url ?: "https://www.youtube.com")
         } else {
             super.onBackPressed()
         }
@@ -983,6 +988,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        // XOÁ LỊCH SỬ YouTube khi app bị đưa hẳn xuống nền (thoát app, vuốt khỏi recents...):
+        // nếu đang xem video rồi thoát thẳng app (không bấm back về trang chủ YouTube), lịch sử
+        // tìm kiếm vẫn còn trong WebView -> vào lại app lần sau back vài lần lại về trang tìm
+        // kiếm cũ. Xoá ở đây để mỗi lần mở lại app luôn bắt đầu lịch sử sạch.
+        if (::webView.isInitialized) webView.clearHistory()
     }
 
     /** Bố cục "ô đầu tiên" (pane1) LUÔN LUÔN là customView (video HTML5 đang toàn màn hình,
