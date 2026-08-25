@@ -5,10 +5,10 @@ import android.content.Context
 /** Lưu và khôi phục danh sách URL tab của phiên "Duyệt web" (IncognitoActivity) để người dùng
  *  không mất các tab đang mở khi thoát app rồi vào lại.
  *
- *  Lưu ý: đây là "Duyệt web" (trình duyệt phụ có đa tab), KHÔNG phải ẩn danh thật sự -
- *  cookie/phiên đăng nhập trong tiến trình này vẫn bị hệ thống xoá khi process kết thúc
- *  (do android:process=":incognito" cô lập hoàn toàn); chỉ có DANH SÁCH URL là được lưu lại
- *  qua SharedPreferences để mở lại đúng trang khi vào lại app. */
+ *  Lưu ý: "Duyệt web" ở đây KHÔNG phải ẩn danh thật sự - IncognitoActivity chạy CHUNG tiến
+ *  trình với MainActivity (Manifest đã bỏ android:process=":incognito"), nên cookie/phiên đăng
+ *  nhập vẫn được GIỮ NGUYÊN giữa các lần mở, không bị hệ thống xoá. Ngoài cookie ra, DANH SÁCH
+ *  URL các tab cũng được lưu riêng qua SharedPreferences ở đây để mở lại đúng trang. */
 object IncognitoSessionStore {
     private const val PREFS = "incognito_session"
     private const val KEY_URLS = "urls"

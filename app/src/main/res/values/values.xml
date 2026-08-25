@@ -54,7 +54,15 @@
         <item name="colorAccent">@color/wp_accent</item>
         <item name="colorSecondary">@color/wp_accent</item>
         <item name="android:windowBackground">@color/app_bg</item>
-        <item name="android:textColorPrimary">@color/pure_white</item>
+        <!-- FIX: trước đây hard-code cứng @color/pure_white (trắng tuyệt đối) trong khi
+             windowBackground (@color/app_bg) lại TỰ ĐỔI theo theme hệ thống (đen lúc tối, gần
+             trắng #F5F5F5 lúc sáng) - y hệt lỗi "chữ trắng trên nền trắng" đã tìm và sửa ở
+             Theme.WP.Dialog bên dưới, nhưng theme CHÍNH của app lại bị bỏ sót chưa sửa. Đổi sang
+             @color/app_text (đã có sẵn cặp day/night đúng, xem values/colors.xml và
+             values-night/values.xml) để mọi chữ dùng màu mặc định của theme (không tự
+             setTextColor riêng) luôn tương phản đúng với nền, không bị chìm mất khi máy đang ở
+             chế độ Sáng. -->
+        <item name="android:textColorPrimary">@color/app_text</item>
         <item name="android:statusBarColor">@color/wp_black</item>
         <item name="android:navigationBarColor">@color/wp_black</item>
         <!-- Font gần giống Segoe UI nhất có sẵn trên Android: mảnh, không chân -->

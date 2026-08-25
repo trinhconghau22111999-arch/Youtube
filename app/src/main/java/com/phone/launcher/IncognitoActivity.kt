@@ -207,8 +207,9 @@ class IncognitoActivity : AppCompatActivity() {
             newTab(startUrl)
         } else {
             // Khôi phục các tab của phiên trước (nếu có) để người dùng tiếp tục đúng chỗ đã xem.
-            // Cookie/phiên đăng nhập trong process này KHÔNG được giữ (process riêng bị kill khi
-            // thoát app), nhưng URL thì được lưu lại để mở lại đúng trang.
+            // Cookie/phiên đăng nhập được GIỮ NGUYÊN (không bị mất) vì hoạt động CHUNG tiến
+            // trình + chung cookie store với MainActivity (xem comment đầu file) - URL các tab
+            // cũng được lưu lại để mở đúng trang.
             val savedUrls = IncognitoSessionStore.loadUrls(this)
             if (savedUrls != null) {
                 val savedActive = IncognitoSessionStore.loadActiveIndex(this)
