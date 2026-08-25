@@ -476,17 +476,17 @@ class MainActivity : AppCompatActivity() {
             val text = data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
                 ?.firstOrNull() ?: return
             // Điền text vào input tìm kiếm YouTube và trigger search
-            // Escape text để dùng an toàn trong JS string (tránh ký tự đặc biệt/quote phá vỡ JS)
+            // Escape text để dùng an toàn trong JS string
             val textEscaped = text.replace("\\", "\\\\").replace("'", "\\'")
             val js = "(function(){" +
                 "var q=document.querySelector('input#search,input[name=search_query],ytm-searchbox input');" +
                 "if(q){" +
-                    "q.value='${'$'}{textEscaped}';" +
-                    "q.dispatchEvent(new Event('input',{bubbles:true}));" +
-                    "var f=q.closest('form');if(f){f.submit();}else{" +
-                    "q.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',keyCode:13,bubbles:true}));}" +
+                "q.value='" + textEscaped + "';" +
+                "q.dispatchEvent(new Event('input',{bubbles:true}));" +
+                "var f=q.closest('form');if(f){f.submit();}else{" +
+                "q.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',keyCode:13,bubbles:true}));}" +
                 "}else{" +
-                    "window.location.href='https://www.youtube.com/results?search_query='+encodeURIComponent('${'$'}{textEscaped}');" +
+                "window.location.href='https://www.youtube.com/results?search_query='+encodeURIComponent('" + textEscaped + "');" +
                 "}})();"
             if (::webView.isInitialized) webView.evaluateJavascript(js, null)
         }
