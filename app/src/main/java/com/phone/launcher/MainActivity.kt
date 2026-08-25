@@ -184,9 +184,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingWebPermissionRequest: PermissionRequest? = null
     private var pendingGeoOrigin: String? = null
     private var pendingGeoCallback: android.webkit.GeolocationPermissions.Callback? = null
-    // Callback chờ kết quả nhận dạng giọng nói (YouTube tìm kiếm bằng mic) - lưu tạm trong lúc
-    // RecognizerIntent đang chạy, nhận kết quả về ở onActivityResult rồi điền vào WebView.
-    private var pendingSpeechCallback: android.webkit.SpeechRecognitionCallback? = null
+    // RequestCode cho RecognizerIntent nhận dạng giọng nói (YouTube tìm kiếm bằng mic)
+    private val REQ_SPEECH = 201
 
     // Đánh dấu điều hướng do chính app gọi (từ thanh địa chỉ / menu đề xuất / mở lại tab)
     // để KHÔNG hỏi xác nhận, chỉ hỏi khi người dùng bấm link ngay trên trang.
@@ -472,14 +471,26 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         // Kết quả nhận dạng giọng nói từ RecognizerIntent (YouTube bấm icon mic tìm kiếm):
-        // lấy văn bản nhận dạng được rồi trả về cho WebView qua SpeechRecognitionCallback.
-        if (requestCode == REQ_SPEECH) {
-            val results = if (resultCode == RESULT_OK && data != null) {
-                data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
-                    ?.map { it } ?: emptyList()
-            } else emptyList()
-            pendingSpeechCallback?.speechRecognitionResult(results)
-            pendingSpeechCallback = null
+        // lấy văn bản nhận dạng được rồi inject vào ô tìm kiếm YouTube qua JS.
+        if (requestCode == REQ_SPEECH && resultCode == RESULT_OK && data != null) {
+            val text = data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull() ?: return
+            // Điền text vào input tìm kiếm YouTube và trigger search
+            val js = """
+                (function() {
+                    var q = document.querySelector('input#search, input[name=search_query], ytm-searchbox input');
+                    if (q) {
+                        q.value = ${json.dumps(text)};
+                        q.dispatchEvent(new Event('input', {bubbles:true}));
+                        var form = q.closest('form');
+                        if (form) { form.submit(); }
+                        else { q.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',keyCode:13,bubbles:true})); }
+                    } else {
+                        window.location.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(${json.dumps(text)});
+                    }
+                })();
+            """.trimIndent()
+            if (::webView.isInitialized) webView.evaluateJavascript(js, null)
         }
     }
 
@@ -619,30 +630,11 @@ class MainActivity : AppCompatActivity() {
         // hoàn toàn API định vị của trình duyệt (navigator.geolocation) nếu không bật dòng này.
         webView.settings.setGeolocationEnabled(true)
 
-        // Bắt sự kiện YouTube (hoặc bất kỳ trang nào) yêu cầu nhận dạng giọng nói qua Web Speech
-        // API (webkitSpeechRecognition) - WebView mặc định KHÔNG có bridge này nên im lặng, người
-        // dùng bấm icon mic không có gì xảy ra. Override bằng cách launch RecognizerIntent của
-        // Android (hệ thống nhận dạng giọng nói chính thức), lấy kết quả rồi trả về cho trang web.
-        webView.setSpeechRecognitionCallback { callback ->
-            pendingSpeechCallback = callback
-            try {
-                val intent = android.speech.RecognizerIntent.getVoiceDetailsIntent(this)
-                    ?: android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                            android.speech.RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
-                        putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-                        putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Tìm kiếm trên YouTube")
-                    }
-                @Suppress("DEPRECATION")
-                startActivityForResult(intent, REQ_SPEECH)
-            } catch (e: Exception) {
-                // Máy không có app nhận dạng giọng nói (hiếm) -> trả về rỗng để YouTube tự xử lý
-                pendingSpeechCallback?.speechRecognitionResult(emptyList())
-                pendingSpeechCallback = null
-            }
-        }
-
         webView.addJavascriptInterface(VideoDownloadBridge(), "AndroidDownloader")
+        // Bridge nhận dạng giọng nói: YouTube bấm icon mic -> JS gọi AndroidSpeech.startListening()
+        // -> app launch RecognizerIntent hệ thống -> kết quả trả về qua onActivityResult ->
+        // evaluateJavascript điền text vào ô tìm kiếm YouTube.
+        webView.addJavascriptInterface(SpeechBridge(), "AndroidSpeech")
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -884,6 +876,8 @@ class MainActivity : AppCompatActivity() {
                     // quét toàn bộ DOM mỗi 700ms, YouTube có hàng nghìn element -> gây lag nặng.
                     // YoutubeAdSkipper đã xử lý overlay quảng cáo YouTube rồi, không cần thêm.
                     view?.evaluateJavascript(YoutubeAdSkipper.JS, null)
+                    // Inject bridge mic: gắn AndroidSpeech.startListening() vào nút mic của YouTube
+                    view?.evaluateJavascript(YoutubeMicBridge.JS, null)
                 } else {
                     // Nút "Tải về" (VideoDownloadUI) KHÔNG chèn trên YouTube - vì YouTube mã
                     // hoá luồng video dạng blob: nên nút này bấm vào không tải được gì cả (xem
@@ -1127,6 +1121,29 @@ class MainActivity : AppCompatActivity() {
      *  Gọi mỗi khi trang tải xong (onPageFinished) để luôn khớp đúng trang hiện tại. */
     private fun updateOffButtonVisibility(url: String?) {
         floatingOffButtonHandle?.setVisible(YoutubeAdSkipper.isYoutube(url))
+    }
+
+    /** Bridge JS cho tính năng tìm kiếm giọng nói YouTube: trang web gọi
+     *  AndroidSpeech.startListening() -> app mở hộp thoại nghe giọng nói hệ thống ->
+     *  kết quả về onActivityResult -> inject vào ô tìm kiếm YouTube. */
+    inner class SpeechBridge {
+        @android.webkit.JavascriptInterface
+        fun startListening() {
+            runOnUiThread {
+                try {
+                    val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                            android.speech.RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+                        putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                        putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Tìm kiếm trên YouTube")
+                    }
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(intent, REQ_SPEECH)
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "Máy chưa hỗ trợ nhận dạng giọng nói", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     // Thoát app -> xoá sạch mọi dấu vết phiên làm việc
