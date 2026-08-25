@@ -425,11 +425,13 @@ class IncognitoActivity : AppCompatActivity() {
     }
 
     // Khoảng thời gian tối đa giữa 2 lần chạm liên tiếp vào ĐÚNG 1 link để tính là "double-tap"
-    // hợp lệ (xem shouldOverrideUrlLoading() ở trên) - 1000ms (1 giây): quá mốc này, link đã ghi
-    // nhớ ở lần chạm đầu bị coi như "quên" - chạm lại sau đó tính lại từ đầu như lần chạm đầu
-    // tiên mới, phải chạm thêm 1 lần nữa mới mở được.
+    // hợp lệ (xem shouldOverrideUrlLoading() ở trên) - 300ms: quá mốc này, link đã ghi nhớ ở lần
+    // chạm đầu bị coi như "quên" - chạm lại sau đó tính lại từ đầu như lần chạm đầu tiên mới,
+    // phải chạm thêm 1 lần nữa mới mở được. GIẢM từ 1000ms xuống 300ms theo yêu cầu: phải chạm
+    // THẬT NHANH 2 lần liên tục (cả khoảng cách giữa 2 lần chạm LẪN thời gian "nhớ" lần chạm đầu
+    // đều dùng chung đúng 1 mốc 300ms này - lần chạm đầu chỉ được "nhớ" tối đa 300ms).
     private companion object {
-        const val DOUBLE_TAP_WINDOW_MS = 1000L
+        const val DOUBLE_TAP_WINDOW_MS = 300L
     }
 
     /** Trang HIỆN TẠI có phải Google không (google.com, www.google.com, và các tên miền quốc
