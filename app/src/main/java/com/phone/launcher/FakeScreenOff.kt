@@ -60,6 +60,13 @@ object FakeScreenOff {
     // vào đúng WebView nào (không lưu context/activity để tránh leak, chỉ cần WebView).
     private var pendingWebView: WebView? = null
 
+    // Callback do nơi gọi [show] truyền vào (nếu có), được gọi lại đúng 1 lần khi [hide] thực sự
+    // tắt lớp phủ ĐANG hiện (không gọi nếu [hide] được gọi lúc không có gì đang hiện, ví dụ gọi
+    // "dọn dẹp cho chắc" ở onDestroy() dù overlay đã tắt từ trước) - dùng để nơi gọi tự áp dụng
+    // lại đúng trạng thái thanh trạng thái/điều hướng hệ thống của MÀN HÌNH ĐÓ (mỗi màn có quy
+    // tắc riêng, FakeScreenOff không biết và không cần biết những quy tắc này).
+    private var onHideCallback: (() -> Unit)? = null
+
     // JS hạ chất lượng video Youtube xuống THẤP NHẤT hiện có, dùng Youtube Player API có sẵn
     // trên trang (biến toàn cục "movie_player" - Youtube tự expose, không phải hack riêng của
     // app). Lưu chất lượng hiện tại vào window.__abbPrevQuality trước khi đổi để [JS_RESTORE_
@@ -113,11 +120,16 @@ object FakeScreenOff {
 
     /** [webView]: truyền WebView đang hiển thị (có thể null nếu không cần hạ chất lượng, ví dụ
      *  gọi từ màn hình không có WebView) - nếu có, tự động hạ chất lượng video xuống thấp nhất
-     *  ngay khi lớp phủ hiện lên, và tự phục hồi khi [hide] được gọi. */
-    fun show(activity: Activity, webView: WebView? = null) {
+     *  ngay khi lớp phủ hiện lên, và tự phục hồi khi [hide] được gọi.
+     *  [onHide]: callback tuỳ chọn, được gọi lại đúng 1 lần khi lớp phủ này thực sự tắt (xem
+     *  giải thích ở [onHideCallback]) - dùng để nơi gọi (MainActivity) tự áp dụng lại đúng trạng
+     *  thái thanh trạng thái/điều hướng hệ thống của màn hình đó ngay sau khi "màn hình" hết
+     *  "giả tắt". */
+    fun show(activity: Activity, webView: WebView? = null, onHide: (() -> Unit)? = null) {
         if (overlay != null) return // đang hiện rồi thì thôi, tránh add trùng window
 
         pendingWebView = webView
+        onHideCallback = onHide
         // Bọc try/catch tương tự [hide] bên dưới - phòng hờ trường hợp cực hiếm WebView truyền
         // vào đã ở trạng thái không hợp lệ ngay lúc gọi (an toàn tương tự, không bắt buộc phải
         // hạ được chất lượng video bằng mọi giá).
@@ -240,6 +252,13 @@ object FakeScreenOff {
      *  suốt lúc "tắt" WebView phía dưới chưa từng bị pause) - VÀ tự động trả chất lượng video
      *  về đúng mức trước khi bật lớp phủ (xem JS_RESTORE_QUALITY ở trên). */
     fun hide() {
+        // Ghi lại TRƯỚC KHI dọn dẹp: có đang thực sự hiện hay không, để quyết định có gọi
+        // [onHideCallback] hay không (chỉ gọi nếu vừa tắt 1 lớp phủ ĐANG hiện thật - không gọi
+        // nếu [hide] được gọi trong lúc không có gì đang hiện, ví dụ lệnh "dọn dẹp cho chắc" ở
+        // MainActivity.onDestroy() dù overlay đã tắt từ trước, tránh gọi callback với 1 Activity
+        // có thể đã/đang bị huỷ).
+        val wasShowing = overlay != null
+
         clockRunnable?.let { clockHandler?.removeCallbacks(it) }
         clockHandler = null
         clockRunnable = null
@@ -263,5 +282,16 @@ object FakeScreenOff {
         } catch (e: Exception) {
         }
         pendingWebView = null
+
+        val callback = onHideCallback
+        onHideCallback = null
+        if (wasShowing) {
+            // Bọc try/catch: Activity phía sau callback có thể đang trong lúc huỷ (onDestroy)
+            // đúng lúc này - không để lỗi ở đây làm crash app.
+            try {
+                callback?.invoke()
+            } catch (e: Exception) {
+            }
+        }
     }
 }

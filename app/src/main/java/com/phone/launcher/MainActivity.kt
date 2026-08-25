@@ -93,6 +93,17 @@ class MainActivity : AppCompatActivity() {
      *  cửa sổ lấy lại focus (onWindowFocusChanged), trang web tải xong - đổi URL
      *  (onPageFinished). */
     private fun applySystemBarsForCurrentState() {
+        // MỚI: đang "tắt màn hình ảo" (FakeScreenOff, xem addFloatingOffButton() bên dưới) ->
+        // LUÔN ẩn hết thanh trạng thái + hàng nút đa nhiệm (3 phím điều hướng), bất kể đang ở
+        // trang nào/xoay hướng nào - kể cả khi đúng lẽ ra phải hiện CỐ ĐỊNH theo quy tắc
+        // YouTube+dọc ngay bên dưới. Ưu tiên cao nhất, kiểm tra và return NGAY ĐẦU hàm để không
+        // rơi vào nhánh showSystemBars() phía dưới. Hàm này được gọi lại từ nhiều nơi (xoay máy,
+        // cửa sổ lấy lại focus, trang tải xong...) nên đặt điều kiện ở đây là đủ, không cần chặn
+        // riêng ở từng nơi gọi.
+        if (FakeScreenOff.isShowing()) {
+            enableImmersiveMode()
+            return
+        }
         val isPortrait = resources.configuration.orientation ==
             android.content.res.Configuration.ORIENTATION_PORTRAIT
         val isOnYoutubePage = ::webView.isInitialized &&
@@ -1068,7 +1079,20 @@ class MainActivity : AppCompatActivity() {
             // Truyền [webView] để FakeScreenOff tự hạ chất lượng video xuống thấp nhất lúc bật
             // (tiết kiệm CPU/GPU giải mã -> đỡ pin hơn khi không ai nhìn hình), và tự phục hồi
             // đúng chất lượng cũ lúc tắt lớp phủ - xem giải thích chi tiết ở FakeScreenOff.kt.
-            onTap = { FakeScreenOff.show(this, webView) },
+            //
+            // onHide: sau khi lớp phủ tắt (chạm đúp vào đồng hồ), tự áp dụng lại ĐÚNG trạng thái
+            // thanh trạng thái/điều hướng hệ thống của trang đang xem (có thể cần hiện lại CỐ
+            // ĐỊNH nếu đang ở YouTube + máy đang dọc, xem applySystemBarsForCurrentState()) -
+            // không tự làm gì thì 2 thanh này sẽ vẫn ở trạng thái ẩn cứng do FakeScreenOff áp
+            // đặt lúc nãy, dù đáng lẽ phải hiện lại theo đúng quy tắc của trang hiện tại.
+            onTap = {
+                FakeScreenOff.show(this, webView, onHide = { applySystemBarsForCurrentState() })
+                // Ẩn ngay lập tức thanh trạng thái + hàng nút đa nhiệm ngay khi chạm nút Off -
+                // không đợi tới lần applySystemBarsForCurrentState() kế tiếp được gọi tự nhiên
+                // (xoay máy/đổi focus/tải trang), vì lúc chạm nút Off không có sự kiện nào trong
+                // số đó tự xảy ra.
+                applySystemBarsForCurrentState()
+            },
             id = "off",
             icon = "⏻",
             defaultIsRight = false,
