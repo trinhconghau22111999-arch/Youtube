@@ -210,6 +210,13 @@ class MainActivity : AppCompatActivity() {
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private lateinit var fullscreenContainer: FrameLayout
 
+    // Cờ đánh dấu lần loadUrl() TIẾP THEO là do CODE tự gọi (navigateTo(), mở lại tab đã lưu...)
+    // chứ không phải do người dùng bấm link/gõ địa chỉ trong trang - dùng ở
+    // shouldOverrideUrlLoading/onPageStarted để phân biệt 2 trường hợp này (ví dụ: không lưu lại
+    // "địa chỉ đang xem" hoặc không chạy 1 số logic chỉ áp dụng cho điều hướng do NGƯỜI DÙNG chủ
+    // động bấm). ĐÃ BỊ XOÁ NHẦM lúc gộp companion object trùng (dọn code) - thêm lại đúng chỗ cũ.
+    private var programmaticLoad = false
+
     companion object {
         const val REQ_PERMISSIONS = 101
         const val REQ_SPEECH = 201
