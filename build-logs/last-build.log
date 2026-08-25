@@ -14,8 +14,8 @@ Daemon will be stopped at the end of the build
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
 > Task :app:checkKotlinGradlePluginConfigurationErrors
-> Task :app:dataBindingMergeDependencyArtifactsDebug
 > Task :app:generateDebugResValues
+> Task :app:dataBindingMergeDependencyArtifactsDebug
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
 > Task :app:mergeDebugResources
@@ -27,6 +27,7 @@ Daemon will be stopped at the end of the build
 > Task :app:extractDeepLinksDebug
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
 > Task :app:javaPreCompileDebug
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
@@ -34,23 +35,16 @@ Daemon will be stopped at the end of the build
 > Task :app:mergeDebugAssets
 > Task :app:compressDebugAssets
 > Task :app:desugarDebugFileDependencies
-> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
 > Task :app:checkDebugDuplicateClasses
 > Task :app:mergeDebugStartupProfile
-> Task :app:processDebugResources
-> Task :app:mergeExtDexDebug
-> Task :app:mergeDebugJniLibFolders
-> Task :app:mergeDebugNativeLibs NO-SOURCE
-> Task :app:mergeLibDexDebug
-> Task :app:stripDebugDebugSymbols NO-SOURCE
-> Task :app:validateSigningDebug
-> Task :app:writeDebugAppMetadata
-> Task :app:writeDebugSigningConfigVersions
 
-> Task :app:compileDebugKotlin FAILED
+> Task :app:compileDebugKotlin
 e: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:483:37 Unresolved reference: json
 e: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:489:119 Unresolved reference: json
-e: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:880:46 Unresolved reference: YoutubeMicBridge
+
+> Task :app:compileDebugKotlin FAILED
+> Task :app:mergeExtDexDebug
 
 FAILURE: Build failed with an exception.
 
@@ -259,7 +253,7 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 1m 27s
-30 actionable tasks: 30 executed
+BUILD FAILED in 1m 31s
+25 actionable tasks: 25 executed
 
 === APK thực tế tìm thấy sau build (find app/build/outputs -iname '*.apk') ===
