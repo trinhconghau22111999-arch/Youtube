@@ -1538,3 +1538,44 @@ object VideoDownloadUI {
     """
 }
 
+/**
+ * Gắn nút mic YouTube vào AndroidSpeech.startListening() (JavascriptInterface):
+ * khi người dùng bấm icon mic trên thanh tìm kiếm YouTube, thay vì dùng
+ * webkitSpeechRecognition (không hoạt động trong WebView), app sẽ mở hộp thoại
+ * nhận dạng giọng nói hệ thống Android, lấy kết quả rồi điền vào ô tìm kiếm.
+ */
+object YoutubeMicBridge {
+    const val JS = """
+        (function() {
+            if (window.__micBridgeRunning) return;
+            window.__micBridgeRunning = true;
+            // Override webkitSpeechRecognition để bắt mọi trang web dùng Web Speech API
+            if (window.AndroidSpeech) {
+                window.SpeechRecognition = window.webkitSpeechRecognition = function() {
+                    this.start = function() { window.AndroidSpeech.startListening(); };
+                    this.stop = function() {};
+                    this.abort = function() {};
+                };
+            }
+            // Gắn thêm vào nút mic YouTube (phòng YouTube không dùng SpeechRecognition API chuẩn)
+            setInterval(function() {
+                try {
+                    var micBtns = document.querySelectorAll(
+                        'button.ytSearchboxComponentMicButton, ' +
+                        '[aria-label*="mic" i], [aria-label*="voice" i], [aria-label*="giọng nói" i]'
+                    );
+                    micBtns.forEach(function(btn) {
+                        if (!btn.__micHooked && window.AndroidSpeech) {
+                            btn.__micHooked = true;
+                            btn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                window.AndroidSpeech.startListening();
+                            }, true);
+                        }
+                    });
+                } catch(e) {}
+            }, 1000);
+        })();
+    """
+}
