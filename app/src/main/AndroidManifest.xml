@@ -29,7 +29,7 @@
             android:supportsPictureInPicture="true"
             android:resizeableActivity="false"
             android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden">
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -47,7 +47,7 @@
         <activity android:name=".IncognitoActivity" android:exported="false"
             android:resizeableActivity="false"
             android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

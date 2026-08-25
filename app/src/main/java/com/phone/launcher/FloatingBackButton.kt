@@ -167,6 +167,25 @@ object FloatingBackButton {
             btn.visibility = if (visible) View.VISIBLE else View.GONE
         }
 
+        /** FIX đồng bộ theme "lúc được lúc không": màu icon/viền trước đây chỉ tính đúng 1 LẦN
+         *  lúc [attach] (đọc uiMode tại thời điểm đó) rồi gán cứng vào view - vì nút nổi này là
+         *  1 WINDOW RIÊNG (thêm bằng WindowManager, KHÔNG thuộc cây view của Activity) nên khi
+         *  Activity đổi theme, nút nổi KHÔNG tự vẽ lại theo - icon cứ giữ nguyên màu cũ (đen
+         *  trên nền đen, hoặc trắng trên nền trắng, tuỳ đổi theo hướng nào) cho tới khi tắt hẳn
+         *  app rồi mở lại. Gọi hàm này mỗi khi Activity phát hiện đổi theme (onConfigurationChanged)
+         *  để vẽ lại đúng màu ngay lập tức, không cần khởi động lại app. */
+        fun refreshIconColorForCurrentTheme(activity: Activity) {
+            val nightMask = android.content.res.Configuration.UI_MODE_NIGHT_MASK
+            val isNightMode = (activity.resources.configuration.uiMode and nightMask) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            val color = if (isNightMode) Color.WHITE else Color.BLACK
+            val strokeColor = (color and 0x00FFFFFF) or 0xCC000000.toInt()
+            (btn as? TextView)?.setTextColor(color)
+            (btn.background as? GradientDrawable)?.setStroke(
+                (2 * activity.resources.displayMetrics.density).toInt(), strokeColor
+            )
+        }
+
         fun detach() {
             if (!fixed) callbacksFor(id).remove(resyncCallback)
             try {

@@ -4,4 +4,9 @@
     <color name="app_bg_secondary">#E0E0E0</color>
     <color name="app_text">#111111</color>
     <color name="app_text_secondary">#555555</color>
+
+    <!-- Nền trang Start (màn hình chính homeOverlay, xem activity_main.xml) - CỐ ĐỊNH màu đen,
+         KHÔNG đặt lại giá trị này trong values-night/ để nó luôn phân giải về ĐÚNG 1 màu duy
+         nhất bất kể theme hệ thống đang sáng hay tối (khác với app_bg vốn đổi theo theme). -->
+    <color name="start_bg">#000000</color>
 </resources>

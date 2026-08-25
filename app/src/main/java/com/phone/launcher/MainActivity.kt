@@ -111,6 +111,33 @@ class MainActivity : AppCompatActivity() {
         // và dựng lại Activity mỗi lần xoay máy) -> phải TỰ cập nhật lại thanh trạng thái/điều
         // hướng ở đây mỗi khi xoay, hệ thống không tự làm giúp trong trường hợp này.
         applySystemBarsForCurrentState()
+
+        // FIX "sáng/tối không đồng bộ hệ thống, lúc được lúc không": trước đây "uiMode" KHÔNG
+        // có trong configChanges -> Android tự huỷ + dựng lại Activity mỗi lần đổi theme. App
+        // này còn được khai báo làm launcher màn hình chính (category.HOME), mà các Activity
+        // đóng vai trò Home bị hệ thống trì hoãn việc huỷ/dựng lại tới khi thật sự hiện lên lại
+        // trên màn hình - nên đôi khi theme đổi ngay lập tức, đôi khi phải mở lại app mới thấy,
+        // tuỳ app đang mở nền hay tiến trình có bị hệ thống giữ nguyên hay không. Giờ đã thêm
+        // "uiMode" vào configChanges -> Android KHÔNG tự huỷ Activity nữa mà gọi thẳng vào đây
+        // mỗi lần đổi theme, dù app đang mở hay đang chạy nền -> ta tự chủ động vẽ lại ngay lập
+        // tức, không phụ thuộc vào thời điểm hệ thống quyết định recreate nữa.
+        if (::webView.isInitialized) {
+            applyDayNightBackgrounds()
+        }
+    }
+
+    /** Vẽ lại các phần nền/màu phụ thuộc theme (sáng/tối) mà trước đây chỉ được nạp ĐÚNG 1 LẦN
+     *  lúc onCreate() qua @color/app_bg (values/ vs values-night/) - vì giờ Activity không còn
+     *  bị huỷ+dựng lại khi đổi theme (xem onConfigurationChanged ở trên) nên các resource này sẽ
+     *  KHÔNG tự đổi màu nữa nếu không gọi tay ở đây. */
+    private fun applyDayNightBackgrounds() {
+        val appBg = androidx.core.content.ContextCompat.getColor(this, R.color.app_bg)
+        findViewById<FrameLayout>(R.id.rootFrame).setBackgroundColor(appBg)
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(appBg))
+        // Nút nổi (FloatingBackButton.attach, hiện dùng cho nút "Off" giả tắt màn hình) tự đọc
+        // uiMode mỗi lần được tạo (xem FloatingBackButton.kt) nhưng KHÔNG tự vẽ lại khi theme
+        // đổi vì nó là 1 window riêng ngoài cây view Activity - gọi tay ở đây để cập nhật ngay.
+        floatingOffButtonHandle?.refreshIconColorForCurrentTheme(this)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -824,12 +851,14 @@ class MainActivity : AppCompatActivity() {
     // trang trong lịch sử (mỗi lần chuyển video/kết quả tìm kiếm là 1 trang mới), lùi từng trang
     // một sẽ phải bấm Back rất nhiều lần mới ra khỏi YouTube. Nếu đang ở 1 trang con YouTube (và
     // KHÔNG ở sẵn trang chủ rồi) -> back NHẢY THẲNG về trang chủ YouTube (bỏ qua toàn bộ lịch sử
-    // các trang con đã xem) thay vì lùi từng bước - NGOẠI TRỪ nếu trong lịch sử có 1 trang KẾT
-    // QUẢ TÌM KIẾM gần nhất (đã gõ từ khoá tìm) thì back sẽ dừng lại ở đúng trang tìm kiếm đó
-    // TRƯỚC (xem findYoutubeSearchIndex()), để không mất kết quả đã tìm; muốn về hẳn trang chủ
-    // YouTube thì bấm back thêm 1 lần nữa từ trang tìm kiếm đó. Đã ở trang chủ YouTube rồi thì
-    // back tiếp theo xử lý bình thường như các trang khác (lùi tiếp lịch sử trước khi vào
-    // YouTube, hoặc về màn hình chính app).
+    // các trang con đã xem) thay vì lùi từng bước - NGOẠI TRỪ nếu trong lịch sử có 1 trang "ĐIỂM
+    // DỪNG" gần nhất (trang KẾT QUẢ TÌM KIẾM đã gõ từ khoá, hoặc trang XEM SAU/LỊCH SỬ - xem
+    // isYoutubeStopPage()) thì back sẽ dừng lại ở đúng trang đó TRƯỚC (xem findYoutubeStopIndex()),
+    // để không mất kết quả tìm/danh sách đang xem dở; muốn về hẳn trang chủ YouTube thì bấm back
+    // thêm 1 lần nữa từ trang đó. Đã ở trang chủ YouTube rồi thì back tiếp theo = THOÁT HẲN khỏi
+    // YouTube (xem exitYoutube() - hàm này tự bỏ qua LUÔN mọi trang con YouTube còn sót lại,
+    // bao gồm cả trang Xem sau/Lịch sử vừa dừng ở trên, nên back từ đây về sau sẽ KHÔNG bao giờ
+    // quay lại trang Xem sau/Lịch sử đó nữa - đúng yêu cầu "xoá lịch sử, không back về nó nữa").
     fun doBack() {
         // Đang ở fullscreen HTML5 THẬT (người dùng tự bấm nút fullscreen của YouTube, hoặc
         // trang tự bật khi xoay ngang) -> Back chỉ thoát fullscreen bình thường.
@@ -837,16 +866,21 @@ class MainActivity : AppCompatActivity() {
             webView.webChromeClient?.onHideCustomView()
             return
         }
-        val currentUrl = webView.url
+        // Đọc trang hiện tại từ copyBackForwardList() - CÙNG NGUỒN DỮ LIỆU mà
+        // findYoutubeStopIndex()/exitYoutube() ở dưới đã dùng - để không bao giờ bị lệch giữa
+        // các hàm cùng xử lý 1 luồng logic Back (webView.url có thể cập nhật trễ hơn danh sách
+        // back-forward thật lúc chuyển trang kiểu SPA chỉ đổi URL bằng pushState).
+        val list = webView.copyBackForwardList()
+        val currentUrl = list.currentItem?.url ?: webView.url
         when {
             webView.canGoBack() && YoutubeAdSkipper.isYoutube(currentUrl) && !YoutubeAdSkipper.isYoutubeHome(currentUrl) -> {
-                val searchIndex = findYoutubeSearchIndex()
+                val stopIndex = findYoutubeStopIndex()
                 programmaticLoad = true
-                if (searchIndex >= 0) {
-                    // Có trang tìm kiếm gần nhất trong lịch sử -> lùi ĐÚNG về trang đó (không tải
-                    // lại từ đầu, chỉ tra danh sách back-forward có sẵn), thay vì nhảy thẳng home.
-                    val list = webView.copyBackForwardList()
-                    webView.goBackOrForward(searchIndex - list.currentIndex)
+                if (stopIndex >= 0) {
+                    // Có trang "điểm dừng" (tìm kiếm, hoặc Xem sau/Lịch sử) gần nhất trong lịch
+                    // sử -> lùi ĐÚNG về trang đó (không tải lại từ đầu, chỉ tra danh sách
+                    // back-forward có sẵn), thay vì nhảy thẳng qua luôn về trang chủ.
+                    webView.goBackOrForward(stopIndex - list.currentIndex)
                 } else {
                     webView.loadUrl("https://www.youtube.com")
                 }
@@ -871,15 +905,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Dò lịch sử NGƯỢC (không tải lại trang, chỉ tra danh sách back-forward có sẵn) từ vị trí
-     *  hiện tại để tìm trang KẾT QUẢ TÌM KIẾM YouTube gần nhất - dùng cho doBack() ở trên: nếu có,
-     *  back sẽ dừng ở đúng trang tìm kiếm đó trước khi về hẳn trang chủ. Trả về -1 nếu không có
-     *  trang tìm kiếm nào trong lịch sử phía trước trang hiện tại. */
-    private fun findYoutubeSearchIndex(): Int {
+     *  hiện tại để tìm trang "ĐIỂM DỪNG" YouTube gần nhất - dùng cho doBack() ở trên: nếu có,
+     *  back sẽ dừng ở đúng trang đó trước khi về hẳn trang chủ, thay vì nhảy thẳng qua. "Điểm
+     *  dừng" gồm: trang KẾT QUẢ TÌM KIẾM (đã gõ từ khoá), hoặc trang XEM SAU/LỊCH SỬ (yêu cầu
+     *  thêm: mở video từ Xem sau/Lịch sử rồi back phải quay lại ĐÚNG danh sách đó trước, không
+     *  nhảy tọt qua luôn về trang chủ) - xem isYoutubeStopPage(). Trả về -1 nếu không có trang
+     *  điểm dừng nào trong lịch sử phía trước trang hiện tại. */
+    private fun findYoutubeStopIndex(): Int {
         val list = webView.copyBackForwardList()
         val currentIndex = list.currentIndex
         for (i in currentIndex - 1 downTo 0) {
             val url = list.getItemAtIndex(i)?.url
-            if (YoutubeAdSkipper.isYoutubeSearch(url)) return i
+            if (YoutubeAdSkipper.isYoutubeStopPage(url)) return i
         }
         return -1
     }
@@ -953,9 +990,34 @@ class MainActivity : AppCompatActivity() {
             pane1.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             fullscreenContainer.addView(pane1, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             fullscreenContainer.visibility = View.VISIBLE
+            // FIX "không bấm được nút cài đặt (bánh răng) góc phải phía trên lúc phóng to video":
+            // app dùng BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE (xem enableImmersiveMode()) để ẩn
+            // thanh trạng thái/điều hướng - kiểu ẩn này khiến Android tự dành riêng vài dp SÁT
+            // MÉP MÀN HÌNH (đặc biệt mép TRÊN) làm vùng cử chỉ "vuốt để hiện lại thanh hệ thống"
+            // - MỌI lượt chạm rơi vào vùng đó bị hệ thống giữ lại cho cử chỉ này, KHÔNG bao giờ
+            // truyền xuống tới trang web. Nút cài đặt của YouTube khi phóng to nằm rất sát mép
+            // trên bên phải -> luôn rơi đúng vào vùng bị hệ thống chặn. setSystemGestureExclusionRects
+            // báo cho Android biết "vùng này app tự xử lý, đừng cướp cử chỉ ở đây" - loại trừ
+            // hẳn dải mép trên (nơi các nút điều khiển video như cài đặt/CC/toàn màn hình nằm)
+            // để chạm luôn tới được trang web như bình thường.
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                fullscreenContainer.post {
+                    val w = fullscreenContainer.width
+                    val h = fullscreenContainer.height
+                    if (w > 0 && h > 0) {
+                        val topBandPx = (56 * resources.displayMetrics.density).toInt()
+                        fullscreenContainer.systemGestureExclusionRects = listOf(
+                            android.graphics.Rect(0, 0, w, minOf(topBandPx, h))
+                        )
+                    }
+                }
+            }
         } else {
             pane1.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             root.addView(pane1, 0)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                fullscreenContainer.systemGestureExclusionRects = emptyList()
+            }
         }
     }
 
@@ -1083,17 +1145,41 @@ object YoutubeAdSkipper {
             var userMuted = null;
             var scriptChanging = false;
             var lastAdShowing = false;
+            // FIX "tốc độ 2x lâu lâu tự về 1x": trước đây biến "adShowing" (có quảng cáo đang
+            // phát không) chỉ tồn tại CỤC BỘ bên trong setInterval, listener 'ratechange' bên
+            // dưới KHÔNG biết được lúc rate đổi có phải đang giữa quảng cáo hay không - nên khi
+            // CHÍNH YOUTUBE tự ép video về 1x lúc quảng cáo bắt đầu (hành vi chuẩn: quảng cáo
+            // luôn phát 1x), listener tưởng nhầm đây là NGƯỜI DÙNG tự đổi -> lưu đè userRate=1
+            // vào localStorage, làm mất tốc độ 2x đã chọn VĨNH VIỄN dù quảng cáo đã hết từ lâu.
+            // Đưa "đang có quảng cáo hay không" ra biến CHUNG (isAdCurrentlyShowing) để listener
+            // đọc được, bỏ qua rate change xảy ra đúng lúc đang có quảng cáo.
+            var isAdCurrentlyShowing = false;
             try {
                 var savedRate = parseFloat(localStorage.getItem(RATE_KEY));
                 if (!isNaN(savedRate) && savedRate > 0) userRate = savedRate;
             } catch (e) {}
 
+            // FIX "video bị tắt tiếng vĩnh viễn sau khi qua quảng cáo": bọc mọi lần script TỰ
+            // đổi playbackRate/muted bằng hàm này thay vì bật rồi tắt cờ scriptChanging ngay
+            // trong cùng 1 lượt code như trước. Lý do: sự kiện 'ratechange'/'volumechange' do
+            // trình duyệt bắn ra KHÔNG chạy đồng bộ - nó được xếp vào hàng đợi và chạy SAU khi
+            // đoạn code hiện tại chạy xong. Nếu tắt cờ ngay thì tới lúc listener thực thi, cờ đã
+            // về false từ trước -> bị hiểu NHẦM là người dùng tự đổi. Cụ thể với mute: script tự
+            // mute quảng cáo, sự kiện volumechange bắn ra sau khi cờ đã tắt, bị ghi nhận nhầm
+            // thành "người dùng chọn tắt tiếng" (userMuted = true), nên lúc khôi phục lại sau
+            // quảng cáo, video bị mute lại y như vậy dù người dùng không hề bấm mute. Dùng
+            // setTimeout(0) để giữ cờ bật cho tới khi các sự kiện do chính lần đổi này gây ra đã
+            // kịp bắn xong mới tắt cờ đi.
+            function scriptSet(fn) {
+                scriptChanging = true;
+                fn();
+                setTimeout(function() { scriptChanging = false; }, 0);
+            }
+
             function applySavedRate(video) {
                 if (!video || userRate === null) return;
                 if (video.playbackRate !== userRate) {
-                    scriptChanging = true;
-                    video.playbackRate = userRate;
-                    scriptChanging = false;
+                    scriptSet(function() { video.playbackRate = userRate; });
                 }
             }
 
@@ -1104,9 +1190,11 @@ object YoutubeAdSkipper {
                 if (!video.__adSkipperListenersAttached) {
                     video.__adSkipperListenersAttached = true;
                     // Chỉ ghi nhận là "người dùng chọn" khi thay đổi KHÔNG PHẢI do chính script
-                    // này gây ra (script luôn bật cờ scriptChanging=true lúc nó tự đổi rate/mute).
+                    // này gây ra (script luôn bật cờ scriptChanging=true lúc nó tự đổi rate/mute)
+                    // VÀ không phải lúc đang có quảng cáo (YouTube tự ép rate=1 lúc này, không
+                    // phải người dùng bấm - xem giải thích isAdCurrentlyShowing ở trên).
                     video.addEventListener('ratechange', function() {
-                        if (scriptChanging) return;
+                        if (scriptChanging || isAdCurrentlyShowing) return;
                         userRate = video.playbackRate;
                         try { localStorage.setItem(RATE_KEY, String(userRate)); } catch (e) {}
                     });
@@ -1133,25 +1221,24 @@ object YoutubeAdSkipper {
                     var video = document.querySelector('video');
                     attachListeners(video);
                     var adShowing = document.querySelector('.ad-showing, .ad-interrupting');
+                    isAdCurrentlyShowing = !!adShowing;
 
                     if (adShowing && video) {
-                        scriptChanging = true;
-                        video.muted = true;
-                        if (video.duration && isFinite(video.duration)) {
-                            video.currentTime = video.duration;
-                        }
-                        scriptChanging = false;
+                        scriptSet(function() {
+                            video.muted = true;
+                            if (video.duration && isFinite(video.duration)) {
+                                video.currentTime = video.duration;
+                            }
+                        });
                         lastAdShowing = true;
                     } else if (video) {
                         if (lastAdShowing) {
                             // Quảng cáo VỪA kết thúc (tick trước còn quảng cáo, tick này đã hết)
                             // -> khôi phục lại trạng thái tắt tiếng người dùng đã chọn (tốc độ
                             // phát được khôi phục chung ở nhánh applySavedRate() ngay bên dưới).
-                            scriptChanging = true;
                             if (userMuted !== null && video.muted !== userMuted) {
-                                video.muted = userMuted;
+                                scriptSet(function() { video.muted = userMuted; });
                             }
-                            scriptChanging = false;
                             lastAdShowing = false;
                         }
                         // TỰ SỬA LẠI mỗi 500ms nếu tốc độ phát bị lệch so với lựa chọn người dùng,
@@ -1189,7 +1276,7 @@ object YoutubeAdSkipper {
                         }
                     }
                 } catch (e) {}
-            }, 500);
+            }, 200);
         })();
     """
 
@@ -1225,6 +1312,33 @@ object YoutubeAdSkipper {
         } catch (e: Exception) {
             false
         }
+    }
+
+    /** Trang "Xem sau" (Watch Later, path "/playlist?list=WL") hoặc "Lịch sử" (History, path
+     *  "/feed/history") - dùng để logic Back "dừng lại" ở đây 1 lần trước khi về hẳn trang chủ
+     *  (xem isYoutubeStopPage()), giống hệt cách xử lý trang tìm kiếm: mở video từ 1 trong 2
+     *  trang này rồi bấm back phải quay lại ĐÚNG danh sách đó trước, không nhảy tọt qua luôn về
+     *  trang chủ - làm mất vị trí đang xem dở trong danh sách. */
+    fun isYoutubeWatchLaterOrHistory(url: String?): Boolean {
+        if (url.isNullOrEmpty()) return false
+        return try {
+            val uri = android.net.Uri.parse(url)
+            val host = uri.host ?: return false
+            if (!host.endsWith("youtube.com")) return false
+            val path = uri.path ?: ""
+            val isWatchLater = path == "/playlist" && uri.getQueryParameter("list") == "WL"
+            val isHistory = path == "/feed/history"
+            isWatchLater || isHistory
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Trang "điểm dừng" YouTube dùng chung cho logic Back thông minh ở doBack()/
+     *  findYoutubeStopIndex(): gồm trang kết quả tìm kiếm VÀ trang Xem sau/Lịch sử - back sẽ
+     *  dừng lại đúng 1 lần ở trang gần nhất thuộc nhóm này trước khi nhảy tiếp về trang chủ. */
+    fun isYoutubeStopPage(url: String?): Boolean {
+        return isYoutubeSearch(url) || isYoutubeWatchLaterOrHistory(url)
     }
 
 }

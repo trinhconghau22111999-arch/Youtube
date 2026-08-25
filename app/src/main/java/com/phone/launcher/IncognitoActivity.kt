@@ -49,7 +49,15 @@ class IncognitoActivity : AppCompatActivity() {
     }
 
 
-    private data class Tab(val webView: WebView, var title: String = "Tab mới")
+    // pendingLinkUrl/pendingLinkTapAt: dùng cho tính năng "phải chạm 2 lần liên tiếp mới mở
+    // link" (xem shouldOverrideUrlLoading() trong setupWebViewCallbacks()) - lưu URL của lần
+    // chạm ĐẦU TIÊN bị chặn và thời điểm chạm, để so khớp với lần chạm KẾ TIẾP.
+    private data class Tab(
+        val webView: WebView,
+        var title: String = "Tab mới",
+        var pendingLinkUrl: String? = null,
+        var pendingLinkTapAt: Long = 0L
+    )
 
     private val tabs = ArrayList<Tab>()
     private var activeIndex = 0
@@ -349,9 +357,39 @@ class IncognitoActivity : AppCompatActivity() {
                 // Chặn scheme không phải http/https (tel:, intent:, v.v.)
                 if (scheme != "http" && scheme != "https") return true
 
-                // Cho phép mở link bình thường - overlay quảng cáo bẫy click đã được
-                // AdOverlayBlocker xử lý rồi, không cần chặn 1 chạm nữa.
-                return false
+                // FIX/TÍNH NĂNG MỚI: "không cho chuyển trang bằng 1 chạm, trừ phi đang ở trang gg
+                // hoặc bấm nút tìm kiếm". Callback shouldOverrideUrlLoading() này CHỈ được gọi
+                // cho điều hướng do CHẠM VÀO LINK bên trong trang gây ra - KHÔNG bao giờ được gọi
+                // cho các lần webView.loadUrl() ta tự gọi thẳng từ code (vd. loadFromInput() khi
+                // bấm nút tìm kiếm/Enter trên thanh địa chỉ) - nên nhánh "nút tìm kiếm" ở đây
+                // TỰ ĐỘNG được cho qua, không cần xử lý gì thêm.
+                //
+                // Đang Ở trang Google (trang HIỆN TẠI, không phải trang SẮP mở) -> luôn cho
+                // chuyển trang bình thường ngay từ 1 chạm, không yêu cầu chạm 2 lần.
+                val currentHost = view?.url?.let { runCatching { Uri.parse(it).host }.getOrNull() }
+                if (isGoogleHost(currentHost)) return false
+
+                // Các trang KHÁC Google: phải chạm ĐÚNG 1 link này 2 LẦN LIÊN TIẾP (trong khoảng
+                // thời gian ngắn) mới thực sự cho mở - để tránh chạm nhầm/lỡ tay vào link (quảng
+                // cáo nguỵ trang thành nội dung, link dày đặc sát nhau...) mở trang ngay lập tức.
+                val targetUrl = request.url.toString()
+                val tab = tabs.firstOrNull { it.webView === view }
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (tab != null && tab.pendingLinkUrl == targetUrl &&
+                    (now - tab.pendingLinkTapAt) <= DOUBLE_TAP_WINDOW_MS
+                ) {
+                    // Đúng link này, chạm lần THỨ 2 trong khung thời gian cho phép -> mở thật.
+                    tab.pendingLinkUrl = null
+                    tab.pendingLinkTapAt = 0L
+                    return false
+                }
+                // Chạm lần đầu (hoặc chạm link khác, hoặc đã quá thời gian chờ từ lần chạm trước)
+                // -> CHẶN, chỉ ghi nhận làm mốc chờ lần chạm kế tiếp.
+                if (tab != null) {
+                    tab.pendingLinkUrl = targetUrl
+                    tab.pendingLinkTapAt = now
+                }
+                return true
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
@@ -359,13 +397,21 @@ class IncognitoActivity : AppCompatActivity() {
                     edtUrl.setText(if (url == null || url == "about:blank") "" else url)
                     refreshStarIcon()
                 }
-                // ── ẨN DANH: XOÁ LỊCH SỬ duyệt web sau mỗi trang load xong ──
-                // Người dùng không thể Back bằng lịch sử WebView (chỉ back trong tab hiện tại
-                // vẫn hoạt động vì WebView giữ back-stack riêng; clearHistory() xoá lịch sử
-                // TOÀN BỘ của WebView này, nên onBackPressed sẽ dùng canGoBack() = false
-                // - ta giữ lại hành vi back bình thường bên trong tab nhưng không lưu lịch sử
-                // bền vững nào ra ngoài).
-                view?.clearHistory()
+                // FIX "back trong tab không lùi về trang trước mà thoát/back ra luôn": trước đây
+                // có gọi view?.clearHistory() ở đây sau MỖI lần trang tải xong. clearHistory()
+                // KHÔNG phải xoá "lịch sử lưu trữ bên ngoài" như comment cũ lầm tưởng - đây là
+                // API xoá THẲNG back/forward stack NỘI BỘ của chính WebView (theo tài liệu
+                // Android: "Clears the internal back/forward list of this WebView"). Gọi nó sau
+                // mỗi trang tải xong nghĩa là: vừa chuyển sang trang mới xong là lập tức xoá sạch
+                // toàn bộ lịch sử điều hướng của tab đó, chỉ còn lại đúng trang vừa tải - nên
+                // canGoBack() luôn = false, khiến onBackPressed() (xem bên dưới) không còn gì để
+                // lùi về nữa và rơi thẳng xuống nhánh thoát/đóng tab, dù người dùng chỉ mới rời
+                // khỏi trang ban đầu đúng 1 bước. Tính năng "Ẩn danh" của app này vốn KHÔNG hề
+                // dựa vào clearHistory() để hoạt động: saveSession() (gọi ngay bên dưới) chỉ lưu
+                // ĐÚNG 1 URL hiện tại của mỗi tab để khôi phục phiên làm việc, không hề lưu lại
+                // toàn bộ lịch sử điều hướng ra bất kỳ đâu - nên xoá dòng clearHistory() này
+                // không làm lộ thêm dấu vết nào cả, chỉ đơn thuần trả lại đúng hành vi Back bình
+                // thường trong tab.
                 view?.evaluateJavascript(ZoomEnabler.JS, null)
                 view?.evaluateJavascript(AdOverlayBlocker.JS, null)
                 if (YoutubeAdSkipper.isYoutube(url)) view?.evaluateJavascript(YoutubeAdSkipper.JS, null)
@@ -376,6 +422,24 @@ class IncognitoActivity : AppCompatActivity() {
 
     private fun loadInTab(index: Int, url: String) {
         tabs.getOrNull(index)?.webView?.loadUrl(url)
+    }
+
+    // Khoảng thời gian tối đa giữa 2 lần chạm liên tiếp vào ĐÚNG 1 link để tính là "double-tap"
+    // hợp lệ (xem shouldOverrideUrlLoading() ở trên) - 1000ms (1 giây): quá mốc này, link đã ghi
+    // nhớ ở lần chạm đầu bị coi như "quên" - chạm lại sau đó tính lại từ đầu như lần chạm đầu
+    // tiên mới, phải chạm thêm 1 lần nữa mới mở được.
+    private companion object {
+        const val DOUBLE_TAP_WINDOW_MS = 1000L
+    }
+
+    /** Trang HIỆN TẠI có phải Google không (google.com, www.google.com, và các tên miền quốc
+     *  gia của Google như google.com.vn, google.co.uk...) - dùng làm ngoại lệ cho tính năng
+     *  "chạm 2 lần mới mở link" ở shouldOverrideUrlLoading(): đang ở trang Google thì luôn cho
+     *  chuyển trang bình thường từ 1 chạm. */
+    private fun isGoogleHost(host: String?): Boolean {
+        if (host.isNullOrEmpty()) return false
+        val h = host.lowercase()
+        return h == "google.com" || h.endsWith(".google.com") || h.matches(Regex("^(www\\.)?google\\.[a-z.]{2,}$"))
     }
 
     private fun switchTab(index: Int) {

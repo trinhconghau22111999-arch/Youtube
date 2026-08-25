@@ -76,9 +76,18 @@
          FilesActivity vì dùng nhầm android.app.AlertDialog gốc thay vì bản có theme riêng). -->
     <style name="Theme.WP.Dialog" parent="Theme.AppCompat.Dialog.Alert">
         <item name="android:windowBackground">@color/app_bg</item>
-        <item name="android:textColor">@color/pure_white</item>
-        <item name="android:textColorPrimary">@color/pure_white</item>
-        <item name="android:textColorSecondary">@color/wp_gray_light</item>
+        <!-- FIX "chữ trong hộp thoại trắng trên nền trắng, không đọc được lúc nền sáng": trước
+             đây textColor/textColorPrimary hard-code cứng @color/pure_white (trắng tuyệt đối)
+             trong khi windowBackground (@color/app_bg) lại TỰ ĐỔI theo theme - đen lúc tối,
+             #F5F5F5 (gần trắng) lúc sáng. Chữ trắng trên nền trắng gần như vô hình lúc theme
+             sáng (đúng lỗi trong ảnh chụp: URL, "Mở trong tab mới", "Huỷ" đều mờ gần như không
+             thấy). Đổi sang dùng @color/app_text/@color/app_text_secondary - 2 màu chữ vốn ĐÃ
+             được định nghĩa sẵn theo cặp day/night y hệt app_bg (đen #111111 lúc nền sáng, trắng
+             #FFFFFF lúc nền tối - xem values/colors.xml và values-night/values.xml) nhưng trước
+             giờ chưa được dùng ở đây. -->
+        <item name="android:textColor">@color/app_text</item>
+        <item name="android:textColorPrimary">@color/app_text</item>
+        <item name="android:textColorSecondary">@color/app_text_secondary</item>
         <item name="colorAccent">@color/wp_accent</item>
         <item name="android:colorAccent">@color/wp_accent</item>
         <item name="android:windowMinWidthMajor">85%</item>

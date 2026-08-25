@@ -13,13 +13,15 @@
         android:layout_height="match_parent"
         android:background="@color/app_bg" />
 
-    <!-- Màn hình chính (homeOverlay) nổi đè lên WebView - nền đen theo theme hệ thống (tối = đen,
-         sáng = trắng/xám nhạt - xem values/colors.xml và values-night/values.xml). -->
+    <!-- Màn hình chính (homeOverlay) nổi đè lên WebView - LUÔN nền đen (@color/start_bg), bất kể
+         theme hệ thống đang sáng hay tối. Trước đây dùng @color/app_bg (đổi theo theme: tối =
+         đen, sáng = trắng/xám nhạt #F5F5F5) - giờ tách riêng ra màu start_bg cố định không có
+         bản values-night/ ghi đè, để trang Start luôn đen dù máy đang ở chế độ sáng. -->
     <FrameLayout
         android:id="@+id/homeOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/app_bg">
+        android:background="@color/start_bg">
 
     </FrameLayout>
 
