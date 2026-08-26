@@ -6,40 +6,11 @@
          code cũ (đổi tên sẽ vỡ build) - chỉ đổi GIÁ TRỊ màu sang "Cobalt Blue", màu accent mặc
          định kinh điển của Windows Phone/Windows 10. -->
     <color name="neon_purple">#0078D7</color>       <!-- Accent chính (Cobalt) -->
-    <color name="neon_purple_dark">#005A9E</color>   <!-- Accent đậm (nhấn/pressed) -->
-    <color name="pure_black">#000000</color>
     <color name="pure_white">#FFFFFF</color>
 
     <!-- Accent hệ thống, dùng chung cho mọi màn hình thay vì @color/neon_purple từ giờ trở đi -->
     <color name="wp_accent">#0078D7</color>
-    <color name="wp_accent_dark">#005A9E</color>
     <color name="wp_black">#000000</color>
-    <color name="wp_gray_dark">#1A1A1A</color>
-    <color name="wp_gray_mid">#767676</color>
-    <color name="wp_gray_light">#CCCCCC</color>
-
-    <!-- 20 màu "Live Tile" gốc của Windows Phone - dùng xoay vòng cho các ô tile trên màn
-         hình chính, mỗi shortcut/app 1 màu như Start Screen thật. -->
-    <color name="wp_tile_lime">#A4C400</color>
-    <color name="wp_tile_green">#60A917</color>
-    <color name="wp_tile_emerald">#008A00</color>
-    <color name="wp_tile_teal">#00ABA9</color>
-    <color name="wp_tile_cyan">#1BA1E2</color>
-    <color name="wp_tile_cobalt">#0078D7</color>
-    <color name="wp_tile_indigo">#6A00FF</color>
-    <color name="wp_tile_violet">#AA00FF</color>
-    <color name="wp_tile_pink">#F472D0</color>
-    <color name="wp_tile_magenta">#D80073</color>
-    <color name="wp_tile_crimson">#A20025</color>
-    <color name="wp_tile_red">#E51400</color>
-    <color name="wp_tile_orange">#FA6800</color>
-    <color name="wp_tile_amber">#F0A30A</color>
-    <color name="wp_tile_yellow">#E3C800</color>
-    <color name="wp_tile_brown">#825A2C</color>
-    <color name="wp_tile_olive">#6D8764</color>
-    <color name="wp_tile_steel">#647687</color>
-    <color name="wp_tile_mauve">#76608A</color>
-    <color name="wp_tile_taupe">#87794E</color>
 
     <!-- Bo góc = 0 khắp nơi (Metro/Flat Design không có bo góc), áp cho MỌI component
          Material (nút, hộp thoại, thẻ...) trong toàn app chỉ bằng 3 dòng này. -->
@@ -76,12 +47,15 @@
         <item name="elevationOverlayEnabled">false</item>
     </style>
 
-    <!-- Giao diện hộp thoại PHẲNG kiểu Windows Phone: nền đen tuyệt đối, KHÔNG bo góc, chữ nút
-         bấm màu accent - dùng cho MỌI AlertDialog trong app qua AlertDialog.Builder(this,
-         R.style.Theme_WP_Dialog) thay vì để hộp thoại tự vẽ theo style HỆ THỐNG mặc định (đa số
-         máy ra nền trắng bo góc + nút xanh Google, phá vỡ hoàn toàn phong cách WP ngay khi có
-         hộp thoại hiện lên - lỗi này trước đây có ở CalendarActivity, ClockActivity,
-         FilesActivity vì dùng nhầm android.app.AlertDialog gốc thay vì bản có theme riêng). -->
+    <!-- Giao diện hộp thoại PHẲNG kiểu Windows Phone: KHÔNG bo góc, nền/chữ tự đổi theo theme
+         Sáng/Tối hệ thống (xem @color/app_bg, @color/app_text - values/colors.xml +
+         values-night/values.xml), chữ nút bấm màu accent - dùng cho MỌI AlertDialog trong app
+         qua AlertDialog.Builder(this, R.style.Theme_WP_Dialog) thay vì để hộp thoại tự vẽ theo
+         style HỆ THỐNG mặc định (đa số máy ra nền trắng bo góc + nút xanh Google, phá vỡ hoàn
+         toàn phong cách WP ngay khi có hộp thoại hiện lên - lỗi này trước đây có ở
+         CalendarActivity, ClockActivity, FilesActivity vì dùng nhầm android.app.AlertDialog gốc
+         thay vì bản có theme riêng - những Activity này không còn tồn tại trong app hiện tại,
+         giữ lại ghi chú để biết gốc tích lỗi). -->
     <style name="Theme.WP.Dialog" parent="Theme.AppCompat.Dialog.Alert">
         <item name="android:windowBackground">@color/app_bg</item>
         <!-- FIX "chữ trong hộp thoại trắng trên nền trắng, không đọc được lúc nền sáng": trước

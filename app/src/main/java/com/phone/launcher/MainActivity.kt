@@ -21,7 +21,6 @@ import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
-import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
@@ -391,28 +390,10 @@ class MainActivity : AppCompatActivity() {
     // ĐÃ XOÁ HẲN: chuyển đổi bản máy tính/di động (User-Agent tuỳ chỉnh) theo yêu cầu - WebView
     // giờ luôn dùng User-Agent MẶC ĐỊNH của hệ thống, không còn ép UA riêng cho bất kỳ trang nào.
 
-    /** Chia sẻ địa chỉ trang đang xem qua app khác (Zalo, Messenger, email...) bằng hộp thoại
-     *  chia sẻ HỆ THỐNG - hộp thoại này KHÔNG thuộc app nên để hệ thống tự vẽ theo ROM máy, không
-     *  can thiệp theme (giống cách app xử lý các Intent mở ứng dụng ngoài khác). */
-    private fun shareCurrentPage() {
-        val url = webView.url ?: return
-        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(android.content.Intent.EXTRA_TEXT, url)
-        }
-        try {
-            startActivity(android.content.Intent.createChooser(send, "Chia sẻ trang qua"))
-        } catch (e: Exception) { }
-    }
-
-    /** Xoá cookie/cache duyệt web - giống hệt lệnh cùng tên ở [SettingsActivity], đặt lại đây để
-     *  bấm được ngay từ App Bar mà không cần rời khỏi trang đang xem. */
-    private fun clearBrowsingData() {
-        android.webkit.CookieManager.getInstance().removeAllCookies(null)
-        android.webkit.CookieManager.getInstance().flush()
-        android.webkit.WebStorage.getInstance().deleteAllData()
-        Toast.makeText(this, "Đã xoá dữ liệu duyệt web", Toast.LENGTH_SHORT).show()
-    }
+    // ĐÃ XOÁ HẲN: chia sẻ trang đang xem (shareCurrentPage) và xoá dữ liệu duyệt web
+    // (clearBrowsingData) - 2 hàm này không được gọi từ đâu cả (không còn App Bar/menu nào gắn
+    // vào chúng trong bản rút gọn hiện tại của app, và [SettingsActivity] mà comment cũ nhắc tới
+    // cũng không tồn tại trong app này).
 
     // ĐÃ XOÁ HẲN: xin quyền (camera/mic/vị trí/thông báo...) ngay lúc mở app - không còn hộp
     // thoại xin quyền nào bật lên khi vừa vào app nữa (xem giải thích ở onCreate()).
@@ -427,14 +408,9 @@ class MainActivity : AppCompatActivity() {
 
     // Màn hình chính (MainActivity) chỉ có ĐÚNG 1 WebView, không có khái niệm "nhiều tab".
 
-    private fun clearAllSessionData() {
-        webView.clearHistory()
-        webView.clearCache(true)
-        CookieManager.getInstance().removeAllCookies(null)
-        CookieManager.getInstance().flush()
-        WebStorage.getInstance().deleteAllData()
-        Toast.makeText(this, "Đã xoá toàn bộ lịch sử", Toast.LENGTH_SHORT).show()
-    }
+    // ĐÃ XOÁ HẲN: clearAllSessionData() (xoá lịch sử/cache/cookie) - hàm này không được gọi từ
+    // đâu cả trong app này (comment cũ nói "gọi qua nút Xoá dữ liệu trong Settings" nhưng app
+    // không có màn Settings nào).
 
     // ---------- Menu đề xuất trang (tam giác) ----------
 
@@ -1140,7 +1116,6 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         // KHÔNG xoá cookie/session khi thoát app - cookie phải được GIỮ LẠI để tài khoản
         // YouTube/Google (và mọi trang web khác) vẫn còn đăng nhập lần sau mở app.
-        // clearAllSessionData() chỉ còn được gọi thủ công qua nút "Xoá dữ liệu" trong Settings.
         // Chỉ dọn view/window để tránh leak (không liên quan đến session).
         floatingOffButtonHandle?.detach()
         FakeScreenOff.hide()

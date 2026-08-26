@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="app_bg">#F5F5F5</color>
-    <color name="app_bg_secondary">#E0E0E0</color>
     <color name="app_text">#111111</color>
     <color name="app_text_secondary">#555555</color>
 
