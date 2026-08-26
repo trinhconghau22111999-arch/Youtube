@@ -814,15 +814,27 @@ class MainActivity : AppCompatActivity() {
                 if (YoutubeAdSkipper.isYoutubeHome(url)) {
                     view?.post { webView.clearHistory() }
                 }
-                view?.evaluateJavascript(AdOverlayBlocker.JS, null)
+                // BUG ĐÃ SỬA: trước đây dòng evaluateJavascript(AdOverlayBlocker.JS) này nằm
+                // NGOÀI nhánh if/else bên dưới nên chạy TRÊN CẢ YouTube, dù comment ngay dưới ghi
+                // rõ ý định "AdOverlayBlocker KHÔNG chạy trên YouTube" - code và comment MÂU
+                // THUẪN nhau. Hậu quả thực tế: killOverlays() (quét mọi 2 giây, ẩn + tắt
+                // pointer-events mọi phần tử phủ ≥85% màn hình có z-index cao) coi luôn lớp phủ
+                // mờ (scrim) của hộp thoại YouTube (ví dụ hộp thoại "Lưu vào xem sau" mở từ nút
+                // 3 chấm ở trang chủ) là "quảng cáo full-screen" nên tự ý ẩn nó đi - khiến hộp
+                // thoại không tài nào tắt được nữa (chạm ra ngoài, vuốt xuống đều vô tác dụng vì
+                // lớp nhận chạm để đóng hộp thoại đã bị pointer-events:none). Nay chuyển đúng vào
+                // nhánh else bên dưới (chỉ trang KHÔNG PHẢI YouTube) như comment đã mô tả.
                 if (YoutubeAdSkipper.isYoutube(url)) {
                     // AdOverlayBlocker KHÔNG chạy trên YouTube - nó dùng querySelectorAll('body *')
-                    // quét toàn bộ DOM mỗi 700ms, YouTube có hàng nghìn element -> gây lag nặng.
-                    // YoutubeAdSkipper đã xử lý overlay quảng cáo YouTube rồi, không cần thêm.
+                    // quét toàn bộ DOM mỗi 2 giây, YouTube có hàng nghìn element -> gây lag nặng,
+                    // lại còn dễ ẩn nhầm chính giao diện thật của YouTube (menu/hộp thoại...) như
+                    // lỗi đã tìm thấy ở trên. YoutubeAdSkipper đã xử lý overlay quảng cáo YouTube
+                    // rồi, không cần AdOverlayBlocker chạy thêm.
                     view?.evaluateJavascript(YoutubeAdSkipper.JS, null)
                     // Inject bridge mic: gắn AndroidSpeech.startListening() vào nút mic của YouTube
                     view?.evaluateJavascript(YoutubeMicBridge.JS, null)
                 } else {
+                    view?.evaluateJavascript(AdOverlayBlocker.JS, null)
                     // Nút "Tải về" (VideoDownloadUI) KHÔNG chèn trên YouTube - vì YouTube mã
                     // hoá luồng video dạng blob: nên nút này bấm vào không tải được gì cả (xem
                     // giải thích ở VideoDownloadUI), chỉ án ngữ giao diện vô ích. Các trang khác
@@ -1308,12 +1320,22 @@ object YoutubeAdSkipper {
                         applySavedRate(video);
                     }
 
+                    // ĐÃ BỎ selector 'tp-yt-paper-dialog.ytd-popup-container' từng có ở đây:
+                    // đây là class CONTAINER CHUNG mà YouTube dùng cho RẤT NHIỀU hộp thoại hợp lệ
+                    // (Lưu vào playlist/xem sau, Chia sẻ, menu 3 chấm...), không riêng gì banner
+                    // "Mở ứng dụng". Cứ mỗi 200ms selector này lại ẩn (display:none) BẤT KỲ hộp
+                    // thoại nào đang mở khớp class đó giữa chừng animation đóng/mở của chính nó -
+                    // khiến vòng đời quản lý bởi thư viện Polymer của YouTube bị rối, để lại lớp
+                    // phủ mờ (backdrop) kẹt cứng không tài nào chạm để tắt được (đúng lỗi đã gặp:
+                    // bấm "Lưu vào xem sau" xong hộp thoại/lớp phủ đen kẹt lại, chạm ra ngoài hay
+                    // vuốt xuống đều không tắt được). Banner "Mở ứng dụng" thật ra ĐÃ được xử lý
+                    // AN TOÀN hơn ở đoạn dò theo NỘI DUNG CHỮ ngay bên dưới rồi, không cần thêm
+                    // selector CSS chung chung dễ bắt nhầm này nữa.
                     var overlays = document.querySelectorAll(
                         '.ytp-ad-overlay-container, .ytp-ad-text-overlay, .ytp-ad-image-overlay, ' +
                         '.video-ads, ytd-promoted-sparkles-web-renderer, ' +
                         'ytd-display-ad-renderer, ytd-in-feed-ad-layout-renderer, ytd-ad-slot-renderer, ' +
                         'ytd-banner-promo-renderer, ytd-mealbar-promo-renderer, #open-app, .app-promo, ' +
-                        'tp-yt-paper-dialog.ytd-popup-container, ' +
                         'ytm-open-in-app-button, ytm-app-promo-banner-renderer, ' +
                         '.mobile-topbar-header-open-app-button-container, ' +
                         'yt-open-in-app-button-renderer, [id*="open-in-app" i], [class*="open-in-app" i]'
