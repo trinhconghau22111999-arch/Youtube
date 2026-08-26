@@ -1273,6 +1273,21 @@ object YoutubeAdSkipper {
                             video.muted = true;
                             if (video.duration && isFinite(video.duration)) {
                                 video.currentTime = video.duration;
+                            } else {
+                                // FIX "back quảng cáo hơi lâu hơn trước": ngay lúc quảng cáo VỪA
+                                // bắt đầu, video.duration thường chưa kịp có giá trị (NaN/Infinity
+                                // trong vài trăm ms đầu) nên nhánh nhảy currentTime=duration ở
+                                // trên bị BỎ QUA hoàn toàn - quảng cáo phát bình thường ở tốc độ
+                                // 1x suốt khoảng đó, không có gì tua nhanh giúp cả (đây chính là
+                                // khoảng "chờ lâu hơn" cảm nhận được). Tăng tạm playbackRate lên
+                                // cao làm phao dự phòng trong đúng lúc này - ngay khi duration có
+                                // giá trị ở tick kế tiếp (200ms sau), nhánh currentTime=duration ở
+                                // trên sẽ nhảy thẳng tới cuối như cũ; nếu 1 số ít quảng cáo đặc
+                                // biệt không bao giờ báo duration thì ít nhất video vẫn được tua
+                                // nhanh 16x (mức trần thật của Chromium/WebView, không phải số ảo)
+                                // thay vì kẹt ở 1x. Tự khôi phục về đúng tốc độ người dùng chọn
+                                // ngay khi quảng cáo kết thúc, xem applySavedRate() ở nhánh dưới.
+                                video.playbackRate = 16;
                             }
                         });
                         lastAdShowing = true;
