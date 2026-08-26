@@ -1211,6 +1211,38 @@ object YoutubeAdSkipper {
             // Đưa "đang có quảng cáo hay không" ra biến CHUNG (isAdCurrentlyShowing) để listener
             // đọc được, bỏ qua rate change xảy ra đúng lúc đang có quảng cáo.
             var isAdCurrentlyShowing = false;
+
+            // FIX MỚI - 3 tình huống rate bị "cướp" và lưu sai thành 1x dù người dùng KHÔNG hề tự
+            // chọn 1x, đều có chung 1 gốc: listener 'ratechange' bên dưới coi MỌI thay đổi rate
+            // không phải do scriptChanging/quảng cáo là "người dùng tự chọn" - nhưng thực tế
+            // trình duyệt/chính YouTube còn tự đổi rate (không do người dùng bấm) ở nhiều tình
+            // huống khác nữa:
+            //   (1) Tua tới/lui (seeking): 1 số đoạn video tải lại qua MSE có thể tự trả rate về
+            //       1 ngay khi tua, dù ô chọn tốc độ trên giao diện vẫn hiện đúng "2x".
+            //   (2) Chuyển từ quảng cáo sang video thật: dù đã có cờ isAdCurrentlyShowing, thời
+            //       điểm NGAY LÚC chuyển tiếp (video nội bộ đang tải lại nguồn) vẫn có thể lọt 1
+            //       sự kiện ratechange rơi đúng khoảng cờ đã tắt nhưng UI chưa kịp ổn định.
+            //   (3) Giữ tay trên video để tăng tốc tạm thời (cử chỉ có sẵn của YouTube) rồi buông
+            //       ra: YouTube tự đổi rate về "tốc độ gốc" mà NÓ nhớ - nhưng vì tốc độ 2x của
+            //       người dùng được SCRIPT NÀY ép bằng DOM trực tiếp (video.playbackRate = ...),
+            //       không đi qua đúng luồng chọn tốc độ nội bộ của YouTube, nên YouTube tưởng
+            //       "tốc độ gốc" là 1x (mặc định) chứ không phải 2x - buông tay ra là rate thật
+            //       bị chính YouTube trả về 1x, và listener bên dưới lại tưởng NGƯỜI DÙNG vừa tự
+            //       chọn 1x, lưu đè mất luôn tuỳ chọn 2x.
+            // Giải pháp CHUNG cho cả 3: thêm 1 "vùng đệm tạm ngưng ghi nhận" (suppressRateCapture)
+            // - trong lúc đang tua, đang giữ tay trên video, hoặc vài trăm ms sau khi các hành
+            // động đó kết thúc, listener 'ratechange' TẠM NGƯNG coi thay đổi là do người dùng
+            // chọn (giống hệt cách isAdCurrentlyShowing đã che chắn cho quảng cáo) - rate lệch đi
+            // trong lúc này sẽ được applySavedRate() ở vòng lặp kế tiếp tự sửa lại đúng ý người
+            // dùng, không bị hiểu nhầm và lưu đè mất.
+            var suppressRateCapture = false;
+            var suppressTimer = null;
+            function suppressRateCaptureFor(ms) {
+                suppressRateCapture = true;
+                if (suppressTimer) clearTimeout(suppressTimer);
+                suppressTimer = setTimeout(function() { suppressRateCapture = false; }, ms);
+            }
+
             try {
                 var savedRate = parseFloat(localStorage.getItem(RATE_KEY));
                 if (!isNaN(savedRate) && savedRate > 0) userRate = savedRate;
@@ -1247,11 +1279,12 @@ object YoutubeAdSkipper {
                 if (!video.__adSkipperListenersAttached) {
                     video.__adSkipperListenersAttached = true;
                     // Chỉ ghi nhận là "người dùng chọn" khi thay đổi KHÔNG PHẢI do chính script
-                    // này gây ra (script luôn bật cờ scriptChanging=true lúc nó tự đổi rate/mute)
-                    // VÀ không phải lúc đang có quảng cáo (YouTube tự ép rate=1 lúc này, không
-                    // phải người dùng bấm - xem giải thích isAdCurrentlyShowing ở trên).
+                    // này gây ra (script luôn bật cờ scriptChanging=true lúc nó tự đổi rate/mute),
+                    // KHÔNG phải lúc đang có quảng cáo (YouTube tự ép rate=1 lúc này, không phải
+                    // người dùng bấm), và KHÔNG rơi vào vùng đệm tạm ngưng (đang tua/đang giữ tay
+                    // tăng tốc/vừa buông ra - xem giải thích đầy đủ ở suppressRateCapture).
                     video.addEventListener('ratechange', function() {
-                        if (scriptChanging || isAdCurrentlyShowing) return;
+                        if (scriptChanging || isAdCurrentlyShowing || suppressRateCapture) return;
                         userRate = video.playbackRate;
                         try { localStorage.setItem(RATE_KEY, String(userRate)); } catch (e) {}
                     });
@@ -1262,10 +1295,41 @@ object YoutubeAdSkipper {
                     video.addEventListener('loadedmetadata', function() {
                         applySavedRate(video);
                     });
+                    // Tua tới/lui: mở vùng đệm tạm ngưng NGAY lúc bắt đầu tua, và giữ thêm 1 chút
+                    // sau khi tua xong (seeked) vì rate có thể chỉ lệch đúng lúc video tải lại
+                    // đoạn mới, không lệch ngay tại thời điểm 'seeking' bắn ra.
+                    video.addEventListener('seeking', function() { suppressRateCaptureFor(700); });
+                    video.addEventListener('seeked', function() {
+                        suppressRateCaptureFor(700);
+                        applySavedRate(video);
+                    });
                     if (userMuted === null) userMuted = video.muted;
                 }
                 if (userRate === null) userRate = video.playbackRate;
                 applySavedRate(video);
+            }
+
+            // Giữ tay trên khu vực video để tăng tốc tạm thời (cử chỉ có sẵn của YouTube) rồi
+            // buông ra - xem giải thích đầy đủ ở tình huống (3) của suppressRateCapture phía
+            // trên. CHỈ mở vùng đệm khi thời lượng chạm đủ LÂU (>= 350ms, đúng kiểu giữ tay, khác
+            // hẳn 1 cái CHẠM NHANH bình thường như chọn tốc độ trong menu Cài đặt hay bấm hiện/ẩn
+            // thanh điều khiển) - để KHÔNG lỡ chặn luôn việc người dùng CHỦ ĐỘNG chọn tốc độ mới
+            // qua menu (chạm nhanh vào 1 mục trong danh sách cũng là touchstart/touchend, nếu mở
+            // vùng đệm cho MỌI lần chạm thì việc chọn tốc độ mới qua menu sẽ không bao giờ được
+            // lưu lại nữa - phản tác dụng). Gắn ở document (capture: true) thay vì trực tiếp trên
+            // video/player vì phần tử player có thể bị YouTube dựng lại (video mới) mà không kích
+            // hoạt lại attachListeners ngay - gắn 1 lần duy nhất ở document là đủ.
+            if (!window.__adSkipperHoldListenersAttached) {
+                window.__adSkipperHoldListenersAttached = true;
+                var touchStartAt = 0;
+                document.addEventListener('touchstart', function() {
+                    touchStartAt = Date.now();
+                }, { passive: true, capture: true });
+                document.addEventListener('touchend', function() {
+                    if (touchStartAt && (Date.now() - touchStartAt) >= 350) {
+                        suppressRateCaptureFor(700);
+                    }
+                }, { passive: true, capture: true });
             }
 
             setInterval(function() {
