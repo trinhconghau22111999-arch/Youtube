@@ -15,20 +15,17 @@ Daemon will be stopped at the end of the build
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
 > Task :app:checkKotlinGradlePluginConfigurationErrors
 > Task :app:generateDebugResValues
-> Task :app:dataBindingMergeDependencyArtifactsDebug
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
 > Task :app:mergeDebugResources
-> Task :app:parseDebugLocalResources
-> Task :app:checkDebugAarMetadata
-> Task :app:dataBindingGenBaseClassesDebug
-> Task :app:mapDebugSourceSetPaths
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:javaPreCompileDebug
-> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
@@ -39,20 +36,21 @@ Daemon will be stopped at the end of the build
 > Task :app:mergeDebugJniLibFolders
 > Task :app:checkDebugDuplicateClasses
 > Task :app:mergeDebugNativeLibs NO-SOURCE
-> Task :app:processDebugResources
-> Task :app:mergeExtDexDebug
-> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:processDebugManifestForPackage
 > Task :app:mergeLibDexDebug
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:processDebugResources
 > Task :app:validateSigningDebug
+> Task :app:mergeExtDexDebug
 > Task :app:writeDebugAppMetadata
 > Task :app:writeDebugSigningConfigVersions
 
 > Task :app:compileDebugKotlin
 w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/IncognitoActivity.kt:270:22 'setter for saveFormData: Boolean' is deprecated. Deprecated in Java
-w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:922:23 'onBackPressed(): Unit' is deprecated. Deprecated in Java
-w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:970:19 'onBackPressed(): Unit' is deprecated. Deprecated in Java
+w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:898:23 'onBackPressed(): Unit' is deprecated. Deprecated in Java
+w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:946:19 'onBackPressed(): Unit' is deprecated. Deprecated in Java
 
-> Task :app:compileDebugJavaWithJavac
+> Task :app:compileDebugJavaWithJavac NO-SOURCE
 > Task :app:dexBuilderDebug
 > Task :app:mergeDebugGlobalSynthetics
 > Task :app:processDebugJavaRes
@@ -62,8 +60,8 @@ w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 1m 35s
-38 actionable tasks: 38 executed
+BUILD SUCCESSFUL in 1m 25s
+35 actionable tasks: 35 executed
 
 === APK thực tế tìm thấy sau build (find app/build/outputs -iname '*.apk') ===
 app/build/outputs/apk/debug/app-debug.apk
