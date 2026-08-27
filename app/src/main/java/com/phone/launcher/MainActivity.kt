@@ -1265,11 +1265,53 @@ object YoutubeAdSkipper {
                 setTimeout(function() { scriptChanging = false; }, 0);
             }
 
+            // FIX "tốc độ phát thực tế đúng nhưng trong menu Cài đặt > Tốc độ phát không đồng
+            // bộ" (dấu ✓ vẫn nằm ở "1x" hay tốc độ cũ dù video đang thực sự phát nhanh/chậm hơn
+            // đúng như đã chọn): trước đây applySavedRate() chỉ gán thẳng video.playbackRate -
+            // đây là thao tác DOM trực tiếp, video phát đúng tốc độ thật, NHƯNG YouTube dùng 1
+            // biến trạng thái NỘI BỘ RIÊNG (không tự đọc lại video.playbackRate) để quyết định
+            // tốc độ nào có dấu ✓ khi mở menu Cài đặt - biến đó CHỈ được cập nhật khi tốc độ được
+            // đổi ĐÚNG QUA API của trình phát, không phải qua DOM. Nay ưu tiên gọi
+            // #movie_player.setPlaybackRate(rate) (API chính thức của YouTube, cùng lúc cập nhật
+            // cả video thật LẪN biến nội bộ dùng để hiển thị menu) - chỉ khi player chưa sẵn sàng
+            // (API chưa tồn tại, ví dụ lúc trang vừa tải xong) mới rơi về gán thẳng DOM như cũ để
+            // tốc độ vẫn đúng ngay, dù khi đó menu có thể tạm chưa đồng bộ tới khi API sẵn sàng ở
+            // lượt kế tiếp.
+            function setPlayerRate(video, rate) {
+                var player = document.getElementById('movie_player');
+                if (player && typeof player.setPlaybackRate === 'function') {
+                    try {
+                        player.setPlaybackRate(rate);
+                        // 1 số phiên bản trình phát cập nhật <video> thật có độ trễ nhỏ sau khi
+                        // gọi API - đảm bảo khớp ngay, không đợi thêm.
+                        if (video.playbackRate !== rate) video.playbackRate = rate;
+                        return;
+                    } catch (e) {}
+                }
+                video.playbackRate = rate;
+            }
+
             function applySavedRate(video) {
                 if (!video || userRate === null) return;
                 if (video.playbackRate !== userRate) {
-                    scriptSet(function() { video.playbackRate = userRate; });
+                    scriptSet(function() { setPlayerRate(video, userRate); });
                 }
+            }
+
+            // Đồng bộ menu Cài đặt > Tốc độ phát ĐÚNG 1 LẦN cho mỗi <video> mới (không phụ
+            // thuộc video.playbackRate đã khớp userRate hay chưa): applySavedRate() ở trên CHỈ
+            // gọi qua API player khi phát hiện video.playbackRate LỆCH với userRate - nhưng nếu
+            // tốc độ thật đã khớp sẵn từ trước (ví dụ đã được gán thẳng DOM ở 1 bản cũ trước khi
+            // sửa lỗi này, hoặc trình duyệt tự giữ nguyên rate cũ khi chuyển sang video kế tiếp
+            // trong danh sách phát) thì applySavedRate() sẽ KHÔNG BAO GIỜ gọi qua API player nữa
+            // (vì không thấy chênh lệch để sửa) - khiến biến trạng thái nội bộ mà YouTube dùng để
+            // hiện dấu ✓ trong menu vẫn mãi kẹt ở giá trị cũ dù tốc độ thật đã đúng từ lâu. Gọi
+            // 1 lần CHẮC CHẮN qua API ngay khi gắn vào <video> mới, bất kể có lệch hay không, để
+            // đảm bảo biến nội bộ luôn được đồng bộ theo tốc độ thật ngay từ đầu.
+            function syncMenuRateOnce(video) {
+                if (!video || userRate === null || video.__ytFixMenuSynced) return;
+                video.__ytFixMenuSynced = true;
+                scriptSet(function() { setPlayerRate(video, userRate); });
             }
 
             function attachListeners(video) {
@@ -1316,6 +1358,7 @@ object YoutubeAdSkipper {
                 }
                 if (userRate === null) userRate = video.playbackRate;
                 applySavedRate(video);
+                syncMenuRateOnce(video);
             }
 
             // Giữ tay trên khu vực video để tăng tốc tạm thời (cử chỉ có sẵn của YouTube) rồi
