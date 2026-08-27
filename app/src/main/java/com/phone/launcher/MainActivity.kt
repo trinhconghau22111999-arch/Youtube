@@ -1412,75 +1412,48 @@ object YoutubeAdSkipper {
                     // vuốt xuống đều không tắt được). Banner "Mở ứng dụng" thật ra ĐÃ được xử lý
                     // AN TOÀN hơn ở đoạn dò theo NỘI DUNG CHỮ ngay bên dưới rồi, không cần thêm
                     // selector CSS chung chung dễ bắt nhầm này nữa.
-                    //
-                    // LỖI VẪN CÒN SAU LẦN SỬA TRÊN (người dùng báo: bấm "Lưu vào xem sau" từ
-                    // TRANG CHỦ vẫn bị kẹt, dù từ trang đang PHÁT VIDEO thì bình thường) - dấu
-                    // hiệu cho thấy còn selector KHÁC trong danh sách bên dưới (hoặc 1 nguyên
-                    // nhân khác chưa lường hết) vô tình khớp phải 1 phần của hộp thoại/backdrop ở
-                    // NGỮ CẢNH TRANG CHỦ cụ thể (DOM trang chủ khác trang xem video). Thay vì tiếp
-                    // tục dò từng selector một cách bị động, giờ CHẶN HẲN toàn bộ khối ẩn overlay
-                    // này lại bất cứ khi nào phát hiện có 1 hộp thoại tp-yt-paper-dialog CỦA
-                    // YOUTUBE đang mở (thuộc tính "opened" - quy ước chuẩn của thư viện Polymer mà
-                    // YouTube dùng để dựng mọi hộp thoại) - đảm bảo an toàn tuyệt đối cho MỌI hộp
-                    // thoại hợp lệ của YouTube ở BẤT KỲ màn hình nào, không phụ thuộc phải liệt kê
-                    // đúng hết từng selector loại trừ như cách làm cũ.
-                    if (!document.querySelector('tp-yt-paper-dialog[opened]')) {
-                        var overlays = document.querySelectorAll(
-                            '.ytp-ad-overlay-container, .ytp-ad-text-overlay, .ytp-ad-image-overlay, ' +
-                            '.video-ads, ytd-promoted-sparkles-web-renderer, ' +
-                            'ytd-display-ad-renderer, ytd-in-feed-ad-layout-renderer, ytd-ad-slot-renderer, ' +
-                            'ytd-banner-promo-renderer, ytd-mealbar-promo-renderer, #open-app, .app-promo, ' +
-                            'ytm-open-in-app-button, ytm-app-promo-banner-renderer, ' +
-                            '.mobile-topbar-header-open-app-button-container, ' +
-                            'yt-open-in-app-button-renderer, [id*="open-in-app" i], [class*="open-in-app" i]'
-                        );
-                        overlays.forEach(function(el) { el.style.display = 'none'; });
-                    }
+                    var overlays = document.querySelectorAll(
+                        '.ytp-ad-overlay-container, .ytp-ad-text-overlay, .ytp-ad-image-overlay, ' +
+                        '.video-ads, ytd-promoted-sparkles-web-renderer, ' +
+                        'ytd-display-ad-renderer, ytd-in-feed-ad-layout-renderer, ytd-ad-slot-renderer, ' +
+                        'ytd-banner-promo-renderer, ytd-mealbar-promo-renderer, #open-app, .app-promo, ' +
+                        'ytm-open-in-app-button, ytm-app-promo-banner-renderer, ' +
+                        '.mobile-topbar-header-open-app-button-container, ' +
+                        'yt-open-in-app-button-renderer, [id*="open-in-app" i], [class*="open-in-app" i]'
+                    );
+                    overlays.forEach(function(el) { el.style.display = 'none'; });
 
                     // FIX "lớp phủ đen kẹt lại sau khi đóng hộp thoại" (vd bấm 3 chấm > Lưu vào
                     // xem sau > vuốt xuống đóng hộp thoại): lớp phủ mờ (backdrop) đứng SAU hộp
-                    // thoại của YouTube có lúc bị KẸT LẠI - hộp thoại đã đóng xong nhưng backdrop
-                    // quên tự dọn theo, che kín gần hết màn hình và chặn luôn mọi thao tác.
-                    //
-                    // LỖI VẪN CÒN sau lần dò theo TÊN CLASS cụ thể ("tp-yt-iron-overlay-backdrop")
-                    // - người dùng báo: mở hộp thoại từ TRANG CHỦ vẫn bị kẹt, dù mở từ trang đang
-                    // PHÁT VIDEO thì bình thường. YouTube nhiều khả năng dùng backdrop KHÁC TÊN
-                    // CLASS tuỳ ngữ cảnh/phiên bản UI (trang chủ vs trang xem video có thể tải
-                    // Polymer component khác nhau) nên dò cứng theo tên class bị lọt mất biến thể
-                    // ở trang chủ. Đổi sang dò theo HÌNH DẠNG/HÀNH VI THỰC TẾ thay vì tên class cụ
-                    // thể: bất kỳ phần tử nào ĐANG hiện (không display:none, opacity > 0), định vị
-                    // fixed/absolute, và PHỦ GẦN KÍN MÀN HÌNH (≥ 70% chiều rộng lẫn chiều cao) --
-                    // trong khi KHÔNG CÓ hộp thoại tp-yt-paper-dialog[opened] nào thật sự đang mở
-                    // để biện minh cho sự tồn tại của nó -- liên tục hơn 1.5 giây (đủ dài để không
-                    // nhầm với hiệu ứng mờ dần/hiện dần bình thường, vốn chỉ mất vài trăm ms) thì
-                    // coi là kẹt mồ côi thật, ép ẩn + tắt pointer-events để trả lại thao tác. Cách
-                    // này không phụ thuộc phải biết đúng tên class YouTube dùng ở TỪNG ngữ cảnh.
-                    var hasOpenDialog = !!document.querySelector('tp-yt-paper-dialog[opened]');
-                    if (!hasOpenDialog) {
-                        var bigCandidates = document.querySelectorAll(
-                            'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop, ' +
-                            'ytd-popup-container, tp-yt-paper-dialog'
-                        );
-                        for (var bk = 0; bk < bigCandidates.length; bk++) {
-                            var bd = bigCandidates[bk];
-                            var bdStyle = window.getComputedStyle(bd);
-                            var looksActive = bdStyle.display !== 'none' && parseFloat(bdStyle.opacity) > 0 &&
-                                (bdStyle.position === 'fixed' || bdStyle.position === 'absolute');
-                            if (looksActive) {
-                                var rect = bd.getBoundingClientRect();
-                                var coversScreen = rect.width >= window.innerWidth * 0.7 &&
-                                    rect.height >= window.innerHeight * 0.7;
-                                if (!coversScreen) looksActive = false;
+                    // thoại của YouTube (thư viện Polymer, class "tp-yt-iron-overlay-backdrop")
+                    // có lúc bị KẸT LẠI - hộp thoại đã đóng xong nhưng backdrop quên tự dọn theo,
+                    // che kín gần hết màn hình (trừ hàng nút điều hướng riêng của YouTube ở đáy)
+                    // và chặn luôn mọi thao tác. KHÔNG rõ chắc chắn nguyên nhân gốc (có thể do
+                    // chính YouTube, hoặc do script này can thiệp gián tiếp), nên xử lý theo
+                    // hướng "tự phát hiện & tự dọn" thay vì cố né 1 nguyên nhân cụ thể: mỗi
+                    // backdrop có thuộc tính/class "opened" do Polymer gắn vào ĐÚNG lúc nó đang
+                    // thực sự phục vụ 1 hộp thoại - backdrop nào TRÔNG như đang hiện (không
+                    // display:none, opacity > 0) mà LẠI THIẾU "opened" liên tục hơn 1.5 giây (đủ
+                    // dài để không nhầm với hiệu ứng mờ dần/hiện dần bình thường của chính nó,
+                    // vốn chỉ mất vài trăm ms) thì coi là kẹt mồ côi thật, ép ẩn + tắt pointer-
+                    // events để trả lại thao tác cho người dùng.
+                    var stuckBackdrops = document.querySelectorAll(
+                        'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop'
+                    );
+                    for (var bk = 0; bk < stuckBackdrops.length; bk++) {
+                        var bd = stuckBackdrops[bk];
+                        var bdStyle = window.getComputedStyle(bd);
+                        var looksActive = bdStyle.display !== 'none' && parseFloat(bdStyle.opacity) > 0;
+                        var hasOpenedFlag = (bd.classList && bd.classList.contains('opened')) ||
+                            bd.hasAttribute('opened');
+                        if (looksActive && !hasOpenedFlag) {
+                            if (!bd.__ytFixSuspectSince) bd.__ytFixSuspectSince = Date.now();
+                            if (Date.now() - bd.__ytFixSuspectSince > 1500) {
+                                bd.style.setProperty('display', 'none', 'important');
+                                bd.style.setProperty('pointer-events', 'none', 'important');
                             }
-                            if (looksActive) {
-                                if (!bd.__ytFixSuspectSince) bd.__ytFixSuspectSince = Date.now();
-                                if (Date.now() - bd.__ytFixSuspectSince > 1500) {
-                                    bd.style.setProperty('display', 'none', 'important');
-                                    bd.style.setProperty('pointer-events', 'none', 'important');
-                                }
-                            } else {
-                                bd.__ytFixSuspectSince = null;
-                            }
+                        } else {
+                            bd.__ytFixSuspectSince = null;
                         }
                     }
 
