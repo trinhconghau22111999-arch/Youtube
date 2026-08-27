@@ -190,6 +190,15 @@ class MainActivity : AppCompatActivity() {
     // onGeolocationPermissionsShowPrompt bên dưới và onRequestPermissionsResult) - KHÔNG xin
     // quyền sẵn lúc mở app nữa, chỉ xin ĐÚNG LÚC trang web thực sự cần.
     private var pendingWebPermissionRequest: PermissionRequest? = null
+    // Đánh dấu URL trang chủ YouTube GẦN NHẤT đã chạy clearHistory() - để chỉ xoá lịch sử ĐÚNG 1
+    // LẦN mỗi khi thực sự vừa ĐẾN trang chủ, không chạy lặp lại mỗi lần onPageFinished tự fire
+    // lại (trang chủ YouTube là SPA nặng, có thể tự fire lại sự kiện này nhiều lần trong lúc
+    // cuộn/tương tác dù người dùng không hề điều hướng đi đâu) - xem giải thích đầy đủ ở
+    // onPageFinished(). Nghi ngờ đây là nguyên nhân khiến hộp thoại (menu 3 chấm...) ở trang chủ
+    // dễ bị kẹt không tắt được trong khi trang xem video (không có đoạn xoá lịch sử này) thì
+    // không sao: clearHistory() có thể làm rối trạng thái điều hướng nội bộ mà YouTube dùng để
+    // quản lý việc đóng/mở dialog, nếu bị gọi lặp lại đúng lúc dialog đang mở.
+    private var lastHomeHistoryCleared: String? = null
     private var pendingGeoOrigin: String? = null
     private var pendingGeoCallback: android.webkit.GeolocationPermissions.Callback? = null
 
@@ -807,12 +816,19 @@ class MainActivity : AppCompatActivity() {
                 // Đổi trang xong (có thể vừa vào/rời YouTube) -> cập nhật lại ngay thanh trạng
                 // thái/điều hướng hệ thống có nên hiện hay ẩn (xem applySystemBarsForCurrentState()).
                 applySystemBarsForCurrentState()
-                // XOÁ LỊCH SỬ ngay khi trang chủ YouTube load xong: dù người dùng về đây bằng
-                // cách nào (back từ video, back từ tìm kiếm, hay tự gõ URL...) thì đến trang chủ
-                // là lịch sử bị xoá sạch ngay lập tức - không còn trang tìm kiếm/video nào có
-                // thể quay lại được nữa kể cả khi vào Lịch sử/Đã lưu rồi back nhiều lần.
+                // XOÁ LỊCH SỬ khi THỰC SỰ VỪA ĐẾN trang chủ YouTube (không lặp lại nếu
+                // onPageFinished tự fire lại nhiều lần cho CÙNG 1 lượt ở trang chủ - xem giải
+                // thích đầy đủ ở lastHomeHistoryCleared): dù người dùng về đây bằng cách nào
+                // (back từ video, back từ tìm kiếm, hay tự gõ URL...) thì đến trang chủ là lịch
+                // sử bị xoá sạch ngay lập tức - không còn trang tìm kiếm/video nào có thể quay
+                // lại được nữa kể cả khi vào Lịch sử/Đã lưu rồi back nhiều lần.
                 if (YoutubeAdSkipper.isYoutubeHome(url)) {
-                    view?.post { webView.clearHistory() }
+                    if (lastHomeHistoryCleared != url) {
+                        lastHomeHistoryCleared = url
+                        view?.post { webView.clearHistory() }
+                    }
+                } else {
+                    lastHomeHistoryCleared = null
                 }
                 // BUG ĐÃ SỬA: trước đây dòng evaluateJavascript(AdOverlayBlocker.JS) này nằm
                 // NGOÀI nhánh if/else bên dưới nên chạy TRÊN CẢ YouTube, dù comment ngay dưới ghi
