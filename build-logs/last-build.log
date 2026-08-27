@@ -30,25 +30,25 @@ Daemon will be stopped at the end of the build
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
-> Task :app:processDebugManifestForPackage
 > Task :app:compressDebugAssets
 > Task :app:desugarDebugFileDependencies
 > Task :app:mergeDebugStartupProfile
-> Task :app:mergeDebugJniLibFolders
+> Task :app:processDebugManifestForPackage
 > Task :app:checkDebugDuplicateClasses
-> Task :app:mergeDebugNativeLibs NO-SOURCE
 > Task :app:processDebugResources
 > Task :app:mergeExtDexDebug
-> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:mergeDebugJniLibFolders
 > Task :app:mergeLibDexDebug
+> Task :app:mergeDebugNativeLibs NO-SOURCE
+> Task :app:stripDebugDebugSymbols NO-SOURCE
 > Task :app:validateSigningDebug
 > Task :app:writeDebugAppMetadata
 > Task :app:writeDebugSigningConfigVersions
 
 > Task :app:compileDebugKotlin
 w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/IncognitoActivity.kt:270:22 'setter for saveFormData: Boolean' is deprecated. Deprecated in Java
-w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:910:23 'onBackPressed(): Unit' is deprecated. Deprecated in Java
-w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:958:19 'onBackPressed(): Unit' is deprecated. Deprecated in Java
+w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:926:23 'onBackPressed(): Unit' is deprecated. Deprecated in Java
+w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:974:19 'onBackPressed(): Unit' is deprecated. Deprecated in Java
 
 > Task :app:compileDebugJavaWithJavac NO-SOURCE
 > Task :app:dexBuilderDebug
@@ -60,7 +60,7 @@ w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 1m 25s
+BUILD SUCCESSFUL in 1m 30s
 35 actionable tasks: 35 executed
 
 === APK thực tế tìm thấy sau build (find app/build/outputs -iname '*.apk') ===
