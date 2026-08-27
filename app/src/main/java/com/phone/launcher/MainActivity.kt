@@ -1423,40 +1423,6 @@ object YoutubeAdSkipper {
                     );
                     overlays.forEach(function(el) { el.style.display = 'none'; });
 
-                    // FIX "lớp phủ đen kẹt lại sau khi đóng hộp thoại" (vd bấm 3 chấm > Lưu vào
-                    // xem sau > vuốt xuống đóng hộp thoại): lớp phủ mờ (backdrop) đứng SAU hộp
-                    // thoại của YouTube (thư viện Polymer, class "tp-yt-iron-overlay-backdrop")
-                    // có lúc bị KẸT LẠI - hộp thoại đã đóng xong nhưng backdrop quên tự dọn theo,
-                    // che kín gần hết màn hình (trừ hàng nút điều hướng riêng của YouTube ở đáy)
-                    // và chặn luôn mọi thao tác. KHÔNG rõ chắc chắn nguyên nhân gốc (có thể do
-                    // chính YouTube, hoặc do script này can thiệp gián tiếp), nên xử lý theo
-                    // hướng "tự phát hiện & tự dọn" thay vì cố né 1 nguyên nhân cụ thể: mỗi
-                    // backdrop có thuộc tính/class "opened" do Polymer gắn vào ĐÚNG lúc nó đang
-                    // thực sự phục vụ 1 hộp thoại - backdrop nào TRÔNG như đang hiện (không
-                    // display:none, opacity > 0) mà LẠI THIẾU "opened" liên tục hơn 1.5 giây (đủ
-                    // dài để không nhầm với hiệu ứng mờ dần/hiện dần bình thường của chính nó,
-                    // vốn chỉ mất vài trăm ms) thì coi là kẹt mồ côi thật, ép ẩn + tắt pointer-
-                    // events để trả lại thao tác cho người dùng.
-                    var stuckBackdrops = document.querySelectorAll(
-                        'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop'
-                    );
-                    for (var bk = 0; bk < stuckBackdrops.length; bk++) {
-                        var bd = stuckBackdrops[bk];
-                        var bdStyle = window.getComputedStyle(bd);
-                        var looksActive = bdStyle.display !== 'none' && parseFloat(bdStyle.opacity) > 0;
-                        var hasOpenedFlag = (bd.classList && bd.classList.contains('opened')) ||
-                            bd.hasAttribute('opened');
-                        if (looksActive && !hasOpenedFlag) {
-                            if (!bd.__ytFixSuspectSince) bd.__ytFixSuspectSince = Date.now();
-                            if (Date.now() - bd.__ytFixSuspectSince > 1500) {
-                                bd.style.setProperty('display', 'none', 'important');
-                                bd.style.setProperty('pointer-events', 'none', 'important');
-                            }
-                        } else {
-                            bd.__ytFixSuspectSince = null;
-                        }
-                    }
-
                     // Nút/thẻ "Mở ứng dụng" (mời cài/mở app YouTube thật) ở đầu trang - selector
                     // CSS của YouTube hay đổi tên class nên KHÔNG đáng tin cậy 100%, dò thêm theo
                     // NỘI DUNG CHỮ (đa ngôn ngữ) để chắc chắn bắt được, dù YouTube đổi class.
