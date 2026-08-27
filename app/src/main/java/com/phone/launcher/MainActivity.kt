@@ -1480,7 +1480,21 @@ object YoutubeAdSkipper {
                         }
                     }
 
-                    // Nút/thẻ "Mở ứng dụng" (mời cài/mở app YouTube thật) ở đầu trang - selector
+                    // ẨN NÚT CÀI ĐẶT (bánh răng ⚙ trên trình phát - đổi chất lượng/tốc độ...) khi
+                    // video ĐANG PHÓNG TOÀN MÀN HÌNH (fullscreen thật, bấm nút fullscreen của
+                    // YouTube hoặc xoay ngang máy tự bật). KHÔNG ẩn khi player ở chế độ bình
+                    // thường (chưa fullscreen) - vẫn cần dùng nút cài đặt để đổi chất lượng/phụ
+                    // đề như thường. YouTube tự gắn class "ytp-fullscreen" lên khung trình phát
+                    // (.html5-video-player) đúng lúc đang fullscreen thật - dùng chính class đó
+                    // để biết trạng thái, không cần tự theo dõi sự kiện fullscreen riêng.
+                    var playerEl = document.querySelector('.html5-video-player');
+                    if (playerEl && playerEl.classList.contains('ytp-fullscreen')) {
+                        var settingsBtn = document.querySelector('.ytp-settings-button');
+                        if (settingsBtn) {
+                            settingsBtn.style.setProperty('display', 'none', 'important');
+                        }
+                    }
+
                     // CSS của YouTube hay đổi tên class nên KHÔNG đáng tin cậy 100%, dò thêm theo
                     // NỘI DUNG CHỮ (đa ngôn ngữ) để chắc chắn bắt được, dù YouTube đổi class.
                     var promoTexts = ['mở ứng dụng', 'open app', 'open the app', 'open in app'];
