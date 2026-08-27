@@ -465,7 +465,15 @@ class IncognitoActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 if (tabs.getOrNull(activeIndex)?.webView === webView) {
-                    edtUrl.setText(if (url == null || url == "about:blank") "" else url)
+                    // FIX "tìm kiếm không Enter được, lâu lâu mở tab mới cũng vậy": trước đây
+                    // setText() ở đây KHÔNG kiểm tra ô địa chỉ có đang được người dùng gõ dở hay
+                    // không - nếu trang (vd. about:blank lúc tab vừa mở) tải xong ĐÚNG LÚC người
+                    // dùng đang gõ/vừa bấm Enter tìm kiếm, chữ vừa gõ bị xoá sạch về giá trị URL
+                    // của trang, khiến loadFromInput() đọc thấy input rỗng nên không làm gì cả.
+                    // Chỉ cập nhật ô địa chỉ khi nó KHÔNG đang giữ focus (người dùng chưa/đang gõ).
+                    if (!edtUrl.hasFocus()) {
+                        edtUrl.setText(if (url == null || url == "about:blank") "" else url)
+                    }
                     refreshStarIcon()
                 }
                 // FIX "back trong tab không lùi về trang trước mà thoát/back ra luôn": trước đây
@@ -529,8 +537,14 @@ class IncognitoActivity : AppCompatActivity() {
         }
         // Trang trống (about:blank, null) -> để thanh địa chỉ TRỐNG, không điền sẵn gì cả,
         // đúng yêu cầu "thanh địa chỉ đừng điền sẵn để người dùng điền".
+        // Chỉ cập nhật khi KHÔNG đang giữ focus (người dùng chưa/đang gõ) - xem giải thích đầy
+        // đủ ở fix tương tự trong onPageFinished() phía trên: switchTab() có thể được gọi (vd.
+        // mở tab đầu tiên) đúng lúc người dùng đang gõ tìm kiếm, setText() không điều kiện sẽ
+        // xoá mất chữ đang gõ.
         val shownUrl = tabs[index].webView.url
-        edtUrl.setText(if (shownUrl == null || shownUrl == "about:blank") "" else shownUrl)
+        if (!edtUrl.hasFocus()) {
+            edtUrl.setText(if (shownUrl == null || shownUrl == "about:blank") "" else shownUrl)
+        }
         refreshStarIcon()
         renderTabBar()
     }
