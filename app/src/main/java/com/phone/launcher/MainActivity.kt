@@ -1282,9 +1282,18 @@ object YoutubeAdSkipper {
                     // này gây ra (script luôn bật cờ scriptChanging=true lúc nó tự đổi rate/mute),
                     // KHÔNG phải lúc đang có quảng cáo (YouTube tự ép rate=1 lúc này, không phải
                     // người dùng bấm), và KHÔNG rơi vào vùng đệm tạm ngưng (đang tua/đang giữ tay
-                    // tăng tốc/vừa buông ra - xem giải thích đầy đủ ở suppressRateCapture).
+                    // tăng tốc/vừa buông ra - xem giải thích đầy đủ ở suppressRateCapture). Nếu
+                    // đang trong 2 trường hợp bị chặn này mà rate LỠ bị đổi rồi (do chính YouTube
+                    // tự ý đổi) - SỬA LẠI NGAY LẬP TỨC tại đây thay vì im lặng bỏ qua rồi đợi tới
+                    // lượt setInterval (200ms) kế tiếp mới sửa: khoảng hở vài trăm ms đó là đúng
+                    // lúc dễ bị 1 sự kiện khác (vd 'seeking' do buông tay gây ra) đọc nhầm giá trị
+                    // rate SAI này rồi lưu đè mất - sửa NGAY tại chỗ triệt tiêu hẳn khoảng hở này.
                     video.addEventListener('ratechange', function() {
-                        if (scriptChanging || isAdCurrentlyShowing || suppressRateCapture) return;
+                        if (scriptChanging) return;
+                        if (isAdCurrentlyShowing || suppressRateCapture) {
+                            applySavedRate(video);
+                            return;
+                        }
                         userRate = video.playbackRate;
                         try { localStorage.setItem(RATE_KEY, String(userRate)); } catch (e) {}
                     });
@@ -1322,14 +1331,22 @@ object YoutubeAdSkipper {
             if (!window.__adSkipperHoldListenersAttached) {
                 window.__adSkipperHoldListenersAttached = true;
                 var touchStartAt = 0;
-                document.addEventListener('touchstart', function() {
-                    touchStartAt = Date.now();
-                }, { passive: true, capture: true });
-                document.addEventListener('touchend', function() {
+                // Gắn CẢ 2 loại sự kiện (Touch Events VÀ Pointer Events): các bản YouTube khác
+                // nhau (và các bản cập nhật theo thời gian) có thể dùng loại nào cũng được cho cử
+                // chỉ giữ tay - nếu chỉ bắt 1 loại mà YouTube lại dùng loại kia thì suppression
+                // hoàn toàn không kích hoạt, coi như vá vô tác dụng. Bắt cả 2 không sao vì trên
+                // màn cảm ứng, trình duyệt thường bắn CẢ 2 loại sự kiện cho CÙNG 1 lần chạm thật -
+                // hàm xử lý dưới đây đọc/ghi lại touchStartAt vô hại dù bị gọi trùng vài lần.
+                var onHoldStart = function() { touchStartAt = Date.now(); };
+                var onHoldEnd = function() {
                     if (touchStartAt && (Date.now() - touchStartAt) >= 350) {
                         suppressRateCaptureFor(700);
                     }
-                }, { passive: true, capture: true });
+                };
+                document.addEventListener('touchstart', onHoldStart, { passive: true, capture: true });
+                document.addEventListener('touchend', onHoldEnd, { passive: true, capture: true });
+                document.addEventListener('pointerdown', onHoldStart, { passive: true, capture: true });
+                document.addEventListener('pointerup', onHoldEnd, { passive: true, capture: true });
             }
 
             setInterval(function() {
