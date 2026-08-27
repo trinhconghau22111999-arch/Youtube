@@ -23,6 +23,10 @@ class BrowserApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Cài bộ bắt crash + canh chừng treo máy (ANR) SỚM NHẤT có thể - xem CrashReporter.kt.
+        // Giúp chẩn đoán đúng nguyên nhân khi app bị "đứng hình"/1 lớp phủ chặn hết chạm-lướt:
+        // thoát hẳn app rồi mở lại, MainActivity sẽ tự hiện lỗi đã ghi được để copy dán báo lỗi.
+        CrashReporter.install(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val processName = currentProcessName()
             // processName dạng "com.phone.launcher:<tên process phụ>" - tiến trình CHÍNH không
