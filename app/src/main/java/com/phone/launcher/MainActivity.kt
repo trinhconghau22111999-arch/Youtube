@@ -2,7 +2,6 @@ package com.phone.launcher
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.content.pm.ActivityInfo
 import android.app.DownloadManager
 import android.content.Intent
@@ -231,8 +230,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val REQ_PERMISSIONS = 101
         const val REQ_SPEECH = 201
-        const val PREFS_STUCK = "stuck_overlay"
-        const val KEY_STUCK_DETECTED = "stuck_detected"
         const val DOWNLOAD_FOLDER = "AdBlockBrowser"
     }
 
@@ -257,22 +254,6 @@ class MainActivity : AppCompatActivity() {
     private fun initAfterUnlock() {
         AdBlocker.init(applicationContext)
         AdBlocker.enabled = true // luôn bật, không cho tắt
-
-        // Lần mở app trước đã tự thoát vì phát hiện bị KẸT (hộp thoại/lớp phủ YouTube không phản
-        // hồi, không thao tác được gì) - xem StuckOverlayBridge.reportStuck() và giải thích đầy
-        // đủ ở đó. Hiện đúng 1 lần thông báo cho biết, rồi xoá cờ đi ngay để không hiện lại nữa ở
-        // các lần mở sau (trừ khi lại gặp đúng sự cố này lần nữa).
-        run {
-            val prefs = getSharedPreferences(PREFS_STUCK, MODE_PRIVATE)
-            if (prefs.getBoolean(KEY_STUCK_DETECTED, false)) {
-                prefs.edit().putBoolean(KEY_STUCK_DETECTED, false).apply()
-                AlertDialog.Builder(this, R.style.Theme_WP_Dialog)
-                    .setTitle("Đã xảy ra sự cố")
-                    .setMessage("Lần trước app phát hiện hộp thoại/lớp phủ trên YouTube bị treo (không thao tác được gì) nên đã tự thoát để tránh bị kẹt máy. Bạn có thể tiếp tục dùng bình thường.")
-                    .setPositiveButton("Đã hiểu", null)
-                    .show()
-            }
-        }
 
         webView = findViewById(R.id.webView)
         webView.setBackgroundColor(android.graphics.Color.TRANSPARENT) // Trong suốt: để nền rootFrame (app_bg, đổi theo theme) lộ ra thay vì đen cứng - tránh nháy đen/trắng khi tải trang
@@ -598,7 +579,6 @@ class MainActivity : AppCompatActivity() {
         // -> app launch RecognizerIntent hệ thống -> kết quả trả về qua onActivityResult ->
         // evaluateJavascript điền text vào ô tìm kiếm YouTube.
         webView.addJavascriptInterface(SpeechBridge(), "AndroidSpeech")
-        webView.addJavascriptInterface(StuckOverlayBridge(), "AndroidStuckDetector")
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -1144,30 +1124,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Cầu nối để script JS trên trang YouTube (xem đoạn phát hiện "backdrop kẹt mồ côi" trong
-     *  YoutubeAdSkipper.JS) báo NGƯỢC LẠI cho tầng native khi phát hiện màn hình bị KẸT thật sự
-     *  (hộp thoại/lớp phủ che kín màn hình, không chạm được vào đâu cả) - lúc này JS phía trên
-     *  cũng đang bị chặn tương tác NÊN không tự xử lý được gì thêm, phải nhờ tầng native can
-     *  thiệp: lưu lại 1 cờ để LẦN MỞ APP SAU biết mà báo cho người dùng, rồi THOÁT HẲN app ngay
-     *  lập tức - đây là lối thoát CHẮC CHẮN nhất khỏi trạng thái kẹt (khác với việc cố tự dò/tự
-     *  ẩn lớp phủ mà không chắc đúng nguyên nhân, dễ vá sai chỗ như đã thử trước đó). */
-    inner class StuckOverlayBridge {
-        @android.webkit.JavascriptInterface
-        fun reportStuck() {
-            runOnUiThread {
-                try {
-                    getSharedPreferences(PREFS_STUCK, MODE_PRIVATE).edit()
-                        .putBoolean(KEY_STUCK_DETECTED, true).apply()
-                } catch (e: Exception) {
-                }
-                // Thoát HẲN toàn bộ task (không chỉ finish() 1 mình Activity này) để chắc chắn
-                // đóng app hoàn toàn, không để lại WebView/tiến trình cũ nào còn giữ trạng thái
-                // kẹt - đúng ý "kẹt là cho thoát tự động luôn".
-                finishAffinity()
-            }
-        }
-    }
-
     // Thoát app -> xoá sạch mọi dấu vết phiên làm việc
     override fun onDestroy() {
         // KHÔNG xoá cookie/session khi thoát app - cookie phải được GIỮ LẠI để tài khoản
@@ -1467,43 +1423,37 @@ object YoutubeAdSkipper {
                     );
                     overlays.forEach(function(el) { el.style.display = 'none'; });
 
-                    // PHÁT HIỆN "kẹt hộp thoại" (vd bấm 3 chấm > Lưu vào xem sau > vuốt xuống
-                    // đóng nhưng lớp phủ đen vẫn còn, không thao tác được gì nữa): lớp phủ mờ
-                    // (backdrop) đứng sau hộp thoại của YouTube (thư viện Polymer, class
-                    // "tp-yt-iron-overlay-backdrop") có lúc bị KẸT LẠI - hộp thoại đã đóng xong
-                    // nhưng backdrop quên tự dọn theo, che kín gần hết màn hình và chặn luôn mọi
-                    // thao tác - kể cả thao tác của CHÍNH SCRIPT NÀY (vì backdrop chặn pointer-
-                    // events lên toàn trang), nên KHÔNG thể tự ẩn nó bằng JS một cách an toàn
-                    // (đã thử và không chắc đúng nguyên nhân gốc, dễ vá nhầm chỗ khác). Thay vào
-                    // đó, báo NGAY cho tầng native qua AndroidStuckDetector để tự THOÁT HẲN app -
-                    // đây là lối thoát chắc chắn nhất khỏi trạng thái kẹt, xem
-                    // MainActivity.StuckOverlayBridge.reportStuck().
-                    //
-                    // Chỉ coi là KẸT THẬT nếu backdrop trông như đang hiện (không display:none,
-                    // độ mờ > 0) mà LẠI THIẾU dấu hiệu "opened" (class/attribute Polymer gắn vào
-                    // ĐÚNG lúc nó đang thực sự phục vụ 1 hộp thoại) liên tục hơn 1.5 giây - đủ
-                    // dài để không nhầm với hiệu ứng mờ dần/hiện dần bình thường của chính nó
-                    // (vốn chỉ mất vài trăm ms).
-                    if (window.AndroidStuckDetector && !window.__stuckReported) {
-                        var stuckBackdrops = document.querySelectorAll(
-                            'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop'
-                        );
-                        for (var bk = 0; bk < stuckBackdrops.length; bk++) {
-                            var bd = stuckBackdrops[bk];
-                            var bdStyle = window.getComputedStyle(bd);
-                            var looksActive = bdStyle.display !== 'none' && parseFloat(bdStyle.opacity) > 0;
-                            var hasOpenedFlag = (bd.classList && bd.classList.contains('opened')) ||
-                                bd.hasAttribute('opened');
-                            if (looksActive && !hasOpenedFlag) {
-                                if (!bd.__ytFixSuspectSince) bd.__ytFixSuspectSince = Date.now();
-                                if (Date.now() - bd.__ytFixSuspectSince > 1500) {
-                                    window.__stuckReported = true;
-                                    try { window.AndroidStuckDetector.reportStuck(); } catch (e) {}
-                                    break;
-                                }
-                            } else {
-                                bd.__ytFixSuspectSince = null;
+                    // FIX "lớp phủ đen kẹt lại sau khi đóng hộp thoại" (vd bấm 3 chấm > Lưu vào
+                    // xem sau > vuốt xuống đóng hộp thoại): lớp phủ mờ (backdrop) đứng SAU hộp
+                    // thoại của YouTube (thư viện Polymer, class "tp-yt-iron-overlay-backdrop")
+                    // có lúc bị KẸT LẠI - hộp thoại đã đóng xong nhưng backdrop quên tự dọn theo,
+                    // che kín gần hết màn hình (trừ hàng nút điều hướng riêng của YouTube ở đáy)
+                    // và chặn luôn mọi thao tác. KHÔNG rõ chắc chắn nguyên nhân gốc (có thể do
+                    // chính YouTube, hoặc do script này can thiệp gián tiếp), nên xử lý theo
+                    // hướng "tự phát hiện & tự dọn" thay vì cố né 1 nguyên nhân cụ thể: mỗi
+                    // backdrop có thuộc tính/class "opened" do Polymer gắn vào ĐÚNG lúc nó đang
+                    // thực sự phục vụ 1 hộp thoại - backdrop nào TRÔNG như đang hiện (không
+                    // display:none, opacity > 0) mà LẠI THIẾU "opened" liên tục hơn 1.5 giây (đủ
+                    // dài để không nhầm với hiệu ứng mờ dần/hiện dần bình thường của chính nó,
+                    // vốn chỉ mất vài trăm ms) thì coi là kẹt mồ côi thật, ép ẩn + tắt pointer-
+                    // events để trả lại thao tác cho người dùng.
+                    var stuckBackdrops = document.querySelectorAll(
+                        'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop'
+                    );
+                    for (var bk = 0; bk < stuckBackdrops.length; bk++) {
+                        var bd = stuckBackdrops[bk];
+                        var bdStyle = window.getComputedStyle(bd);
+                        var looksActive = bdStyle.display !== 'none' && parseFloat(bdStyle.opacity) > 0;
+                        var hasOpenedFlag = (bd.classList && bd.classList.contains('opened')) ||
+                            bd.hasAttribute('opened');
+                        if (looksActive && !hasOpenedFlag) {
+                            if (!bd.__ytFixSuspectSince) bd.__ytFixSuspectSince = Date.now();
+                            if (Date.now() - bd.__ytFixSuspectSince > 1500) {
+                                bd.style.setProperty('display', 'none', 'important');
+                                bd.style.setProperty('pointer-events', 'none', 'important');
                             }
+                        } else {
+                            bd.__ytFixSuspectSince = null;
                         }
                     }
 
