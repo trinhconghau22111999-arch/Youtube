@@ -31,8 +31,8 @@ Daemon will be stopped at the end of the build
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
 > Task :app:processDebugManifestForPackage
-> Task :app:desugarDebugFileDependencies
 > Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
 > Task :app:mergeDebugStartupProfile
 > Task :app:mergeDebugJniLibFolders
 > Task :app:checkDebugDuplicateClasses
@@ -60,7 +60,7 @@ w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 1m 36s
+BUILD SUCCESSFUL in 1m 17s
 35 actionable tasks: 35 executed
 
 === APK thực tế tìm thấy sau build (find app/build/outputs -iname '*.apk') ===
