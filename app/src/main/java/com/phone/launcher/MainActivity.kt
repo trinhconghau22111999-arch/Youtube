@@ -1203,17 +1203,25 @@ object YoutubeAdSkipper {
             // LẦN 2 (đã huỷ - không hiệu quả): giả lập phím Escape để YouTube tự đóng hộp thoại
             // bằng cơ chế của chính nó - không đóng được (YouTube không lắng nghe Escape ở hộp
             // thoại này, khác với giả định ban đầu).
-            // LẦN 3 (hiện tại - SỬA THÊM): bản trước điều hướng về trang chủ SAU 300ms bất kể lúc
-            // đó thực tế đang diễn ra gì, nên phá luôn các luồng NHIỀU BƯỚC của YouTube - ví dụ
-            // bấm "Thêm vào danh sách phát" sẽ MỞ TIẾP 1 hộp thoại con (chọn danh sách phát) chưa
-            // kịp hiện hẳn ra thì đã bị điều hướng mất, không thêm được. Giờ ngay TRƯỚC lúc điều
-            // hướng (đúng lúc hết 300ms), so sánh danh sách phần tử hộp thoại đang hiển thị với
-            // lúc BẮT ĐẦU cú chạm này: nếu xuất hiện phần tử MỚI (khác hẳn, không có trong lúc bắt
-            // đầu chạm) tức là cú chạm này vừa MỞ RA 1 hộp thoại con mới - HUỶ việc điều hướng lần
-            // này, để hộp thoại con đó yên cho người dùng thao tác tiếp; phải CHẠM THÊM 1 LẦN NỮA
-            // (áp dụng lại đúng logic này, lấy hộp thoại con mới làm mốc so sánh) mới thực sự điều
-            // hướng. Nếu không có phần tử mới (hộp thoại cũ đã đóng hẳn, hoặc vẫn y nguyên/kẹt) ->
-            // điều hướng về trang chủ như bình thường.
+            // LẦN 4 (hiện tại - SỬA LẠI cách so sánh): bản LẦN 3 so sánh THAM CHIẾU PHẦN TỬ DOM
+            // (phần tử có phải hoàn toàn MỚI không) để biết có hộp thoại con vừa mở ra hay chưa -
+            // nhưng KHÔNG hiệu quả với "Thêm vào danh sách phát": YouTube không mở 1 khung hộp
+            // thoại MỚI cho bước này, mà TÁI DÙNG ĐÚNG khung hộp thoại cũ, chỉ đổi NỘI DUNG bên
+            // trong (từ danh sách menu 3 chấm sang danh sách playlist) - vẫn cùng 1 phần tử DOM,
+            // nên so theo tham chiếu không thấy khác biệt gì, vẫn bị điều hướng nhầm mất.
+            // Sửa: so sánh NỘI DUNG (chữ hiển thị + số phần tử con) của mọi hộp thoại đang hiện,
+            // thay vì so tham chiếu phần tử - cách này phát hiện đúng cả 2 kiểu thay đổi: hộp
+            // thoại con hoàn toàn MỚI (phần tử khác) LẪN hộp thoại CŨ đổi NỘI DUNG (cùng phần tử,
+            // khác nội dung). Cụ thể ngay TRƯỚC lúc điều hướng (đúng lúc hết 300ms), so sánh chữ
+            // ký nội dung hộp thoại lúc đó với lúc BẮT ĐẦU cú chạm này:
+            //   - Chữ ký KHÁC và KHÔNG RỖNG (hộp thoại vẫn đang hiện, nhưng nội dung đã đổi - vd
+            //     chuyển sang danh sách playlist) -> HUỶ điều hướng lần này, để yên cho người
+            //     dùng thao tác tiếp; phải CHẠM THÊM 1 LẦN NỮA mới thực sự điều hướng.
+            //   - Chữ ký RỖNG (hộp thoại đã đóng hẳn, vd "Lưu vào xem sau" chỉ đóng luôn không mở
+            //     thêm gì) -> điều hướng về trang chủ như bình thường.
+            //   - Chữ ký GIỐNG HỆT lúc trước (hộp thoại vẫn còn y nguyên, không đổi gì - đúng kiểu
+            //     KẸT THẬT, chạm vào không có tác dụng gì) -> vẫn điều hướng về trang chủ, đúng
+            //     mục đích ban đầu của cơ chế này (thoát khỏi trạng thái kẹt).
             //
             // CHỦ Ý bỏ qua cú CHẠM VỪA MỞ hộp thoại ĐẦU TIÊN: chỉ tính là "cần xử lý" nếu đã có ít
             // nhất 1 hộp thoại hiển thị SẴN TỪ TRƯỚC lúc bắt đầu chạm (ghi nhận ở
@@ -1242,25 +1250,36 @@ object YoutubeAdSkipper {
                 } catch (e) {}
                 return result;
             }
-            var dialogOpenBeforeThisTouch = false;
-            var dialogElementsBeforeThisTouch = [];
+            // Chữ ký NỘI DUNG của mọi hộp thoại đang hiện - ghép độ dài chữ hiển thị (textContent)
+            // + số phần tử con của TỪNG hộp thoại lại thành 1 chuỗi duy nhất. Chỉ cần NỘI DUNG đổi
+            // (dù vẫn cùng 1 khung hộp thoại) là chuỗi này đổi theo, không cần phần tử phải khác.
+            function getDialogContentSignature() {
+                var sig = '';
+                var els = getVisibleDialogElements();
+                for (var i = 0; i < els.length; i++) {
+                    sig += (els[i].textContent || '').length + ':' + (els[i].children ? els[i].children.length : 0) + ';';
+                }
+                return sig;
+            }
+            var dialogSignatureBeforeThisTouch = null;
             var goHomeTimer = null;
             function recordDialogStateBeforeTouch() {
-                dialogElementsBeforeThisTouch = getVisibleDialogElements();
-                dialogOpenBeforeThisTouch = dialogElementsBeforeThisTouch.length > 0;
+                var sig = getDialogContentSignature();
+                dialogSignatureBeforeThisTouch = sig.length > 0 ? sig : null;
             }
             function scheduleGoHomeIfStillSameDialog() {
-                if (!dialogOpenBeforeThisTouch) return;
+                if (dialogSignatureBeforeThisTouch === null) return;
                 if (goHomeTimer) clearTimeout(goHomeTimer);
-                var beforeEls = dialogElementsBeforeThisTouch;
+                var beforeSig = dialogSignatureBeforeThisTouch;
                 goHomeTimer = setTimeout(function() {
-                    var afterEls = getVisibleDialogElements();
-                    for (var i = 0; i < afterEls.length; i++) {
-                        if (beforeEls.indexOf(afterEls[i]) === -1) {
-                            // Có hộp thoại CON mới xuất hiện do chính cú chạm này mở ra - không
-                            // điều hướng, để yên cho người dùng thao tác tiếp trên hộp thoại đó.
-                            return;
-                        }
+                    var afterSig = getDialogContentSignature();
+                    if (afterSig.length > 0 && afterSig !== beforeSig) {
+                        // Hộp thoại vẫn đang hiện NHƯNG nội dung đã đổi (mở tiếp bước con, đổi
+                        // sang danh sách khác...) - không điều hướng, để yên cho người dùng thao
+                        // tác tiếp. KHÔNG cần tự gọi lại recordDialogStateBeforeTouch() ở đây -
+                        // cú chạm KẾ TIẾP của người dùng sẽ tự kích hoạt lại đúng logic này qua
+                        // touchstart/mousedown, lấy đúng nội dung MỚI làm mốc so sánh mới.
+                        return;
                     }
                     window.location.href = 'https://www.youtube.com';
                 }, 300);
