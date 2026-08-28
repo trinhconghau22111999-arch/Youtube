@@ -1261,17 +1261,35 @@ object YoutubeAdSkipper {
                 }
                 return sig;
             }
+            // CHỦ Ý CHỈ áp dụng toàn bộ cơ chế "chạm 1 phát -> 300ms sau tự về trang chủ nếu hộp
+            // thoại không đổi gì" này ở ĐÚNG TRANG CHỦ YouTube (host kết thúc "youtube.com" VÀ
+            // đường dẫn rỗng hoặc "/") - GIỐNG HỆT điều kiện isYoutubeHome() ở phía Kotlin. Trước
+            // đây không kiểm tra URL nên áp dụng luôn cho MỌI trang YouTube (xem video, tìm kiếm,
+            // kênh...) - hễ mở bất kỳ hộp thoại nào rồi chạm ra ngoài là 300ms sau bị đá thẳng về
+            // trang chủ, kể cả đang xem dở video, không đúng ý chỉ muốn áp dụng ở trang chủ.
+            function isOnYoutubeHomeNow() {
+                try {
+                    var host = window.location.hostname || '';
+                    var path = window.location.pathname || '';
+                    return host.endsWith('youtube.com') && (path === '' || path === '/');
+                } catch (e) {
+                    return false;
+                }
+            }
             var dialogSignatureBeforeThisTouch = null;
             var goHomeTimer = null;
             function recordDialogStateBeforeTouch() {
+                if (!isOnYoutubeHomeNow()) { dialogSignatureBeforeThisTouch = null; return; }
                 var sig = getDialogContentSignature();
                 dialogSignatureBeforeThisTouch = sig.length > 0 ? sig : null;
             }
             function scheduleGoHomeIfStillSameDialog() {
                 if (dialogSignatureBeforeThisTouch === null) return;
+                if (!isOnYoutubeHomeNow()) { dialogSignatureBeforeThisTouch = null; return; }
                 if (goHomeTimer) clearTimeout(goHomeTimer);
                 var beforeSig = dialogSignatureBeforeThisTouch;
                 goHomeTimer = setTimeout(function() {
+                    if (!isOnYoutubeHomeNow()) return;
                     var afterSig = getDialogContentSignature();
                     if (afterSig.length > 0 && afterSig !== beforeSig) {
                         // Hộp thoại vẫn đang hiện NHƯNG nội dung đã đổi (mở tiếp bước con, đổi
