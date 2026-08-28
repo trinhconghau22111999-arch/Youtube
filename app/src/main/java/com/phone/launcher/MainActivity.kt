@@ -1277,64 +1277,30 @@ object YoutubeAdSkipper {
                 }
             }
             var dialogSignatureBeforeThisTouch = null;
-            var goHomePollTimer = null;
+            var goHomeTimer = null;
             function recordDialogStateBeforeTouch() {
                 if (!isOnYoutubeHomeNow()) { dialogSignatureBeforeThisTouch = null; return; }
                 var sig = getDialogContentSignature();
                 dialogSignatureBeforeThisTouch = sig.length > 0 ? sig : null;
             }
-            // LỖI ĐÃ SỬA: bản trước chỉ so sánh chữ ký ĐÚNG 1 LẦN DUY NHẤT tại mốc 300ms - với
-            // "Lưu vào danh sách phát", YouTube cần TẢI danh sách playlist của người dùng (có thể
-            // qua mạng) trước khi đổi được nội dung hộp thoại sang danh sách đó; nếu việc tải này
-            // chưa xong kịp trong 300ms (mạng chậm, hoặc máy đang xử lý các việc khác), nội dung
-            // hộp thoại tại đúng mốc 300ms đó VẪN CÒN giống hệt lúc trước (chưa kịp đổi) - script
-            // hiểu NHẦM là "không có gì đổi, chắc bị kẹt" rồi điều hướng về trang chủ ngay, huỷ
-            // mất luôn hộp thoại chọn playlist đang tải dở.
-            //
-            // Sửa: thay vì CHỈ kiểm tra 1 lần tại đúng mốc 300ms, giờ kiểm tra LẶP LẠI mỗi 150ms
-            // trong tối đa 1200ms (8 lần) - hễ TẠI BẤT KỲ LẦN kiểm tra nào phát hiện chữ ký đã đổi
-            // khác (và không rỗng) là HUỶ NGAY việc điều hướng, không cần đợi hết 1200ms (đóng
-            // hộp thoại đơn giản như "Lưu vào xem sau" vẫn được phát hiện gần như ngay, KHÔNG bị
-            // chậm đi); chỉ khi ĐỦ 1200ms mà tịnh không có lần nào phát hiện thay đổi (đúng kiểu
-            // KẸT THẬT, hộp thoại không hề nhúc nhích gì) mới thực sự điều hướng về trang chủ.
             function scheduleGoHomeIfStillSameDialog() {
                 if (dialogSignatureBeforeThisTouch === null) return;
                 if (!isOnYoutubeHomeNow()) { dialogSignatureBeforeThisTouch = null; return; }
-                if (goHomePollTimer) clearInterval(goHomePollTimer);
+                if (goHomeTimer) clearTimeout(goHomeTimer);
                 var beforeSig = dialogSignatureBeforeThisTouch;
-                var elapsed = 0;
-                var stepMs = 150;
-                var maxMs = 1200;
-                goHomePollTimer = setInterval(function() {
-                    elapsed += stepMs;
-                    if (!isOnYoutubeHomeNow()) {
-                        clearInterval(goHomePollTimer);
-                        goHomePollTimer = null;
-                        return;
-                    }
+                goHomeTimer = setTimeout(function() {
+                    if (!isOnYoutubeHomeNow()) return;
                     var afterSig = getDialogContentSignature();
                     if (afterSig.length > 0 && afterSig !== beforeSig) {
                         // Hộp thoại vẫn đang hiện NHƯNG nội dung đã đổi (mở tiếp bước con, đổi
-                        // sang danh sách khác, hoặc vừa tải xong danh sách playlist...) - không
-                        // điều hướng, để yên cho người dùng thao tác tiếp. KHÔNG cần tự gọi lại
-                        // recordDialogStateBeforeTouch() ở đây - cú chạm KẾ TIẾP của người dùng sẽ
-                        // tự kích hoạt lại đúng logic này qua touchstart/mousedown, lấy đúng nội
-                        // dung MỚI làm mốc so sánh mới.
-                        clearInterval(goHomePollTimer);
-                        goHomePollTimer = null;
+                        // sang danh sách khác...) - không điều hướng, để yên cho người dùng thao
+                        // tác tiếp. KHÔNG cần tự gọi lại recordDialogStateBeforeTouch() ở đây -
+                        // cú chạm KẾ TIẾP của người dùng sẽ tự kích hoạt lại đúng logic này qua
+                        // touchstart/mousedown, lấy đúng nội dung MỚI làm mốc so sánh mới.
                         return;
                     }
-                    if (elapsed >= maxMs) {
-                        clearInterval(goHomePollTimer);
-                        goHomePollTimer = null;
-                        window.location.href = 'https://www.youtube.com';
-                    }
-                    // afterSig rỗng (hộp thoại đã đóng hẳn) HOẶC vẫn y hệt lúc trước - cả 2 trường
-                    // hợp đều cứ để vòng lặp tiếp tục kiểm tra tới maxMs rồi mới điều hướng, tránh
-                    // điều hướng NGAY khi vừa rỗng ở 1 lần đo giữa chừng do timing/animation đóng
-                    // dở dang (đóng hộp thoại xong, nhưng ngay sau đó lại có hộp con khác mở lên
-                    // trong cùng chuỗi thao tác) - dù trường hợp này khá hiếm.
-                }, stepMs);
+                    window.location.href = 'https://www.youtube.com';
+                }, 300);
             }
             document.addEventListener('touchstart', recordDialogStateBeforeTouch, true);
             document.addEventListener('mousedown', recordDialogStateBeforeTouch, true);
