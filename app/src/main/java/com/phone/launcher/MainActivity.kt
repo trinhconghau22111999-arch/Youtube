@@ -1190,7 +1190,7 @@ object YoutubeAdSkipper {
             if (window.__adSkipperRunning) return;
             window.__adSkipperRunning = true;
 
-            // TÍNH NĂNG (đã sửa lại lần 2): sau khi bấm nút 3 chấm (hoặc bất kỳ nút nào khác) mở
+            // TÍNH NĂNG (đã sửa lại lần 3): sau khi bấm nút 3 chấm (hoặc bất kỳ nút nào khác) mở
             // ra 1 hộp thoại của YouTube (menu 3 chấm, "Lưu vào xem sau", "Chia sẻ", "Thêm vào
             // danh sách phát", xác nhận xoá...) - CHẠM 1 PHÁT tiếp theo ở BẤT KỲ ĐÂU trên màn
             // hình (kể cả ngay trên hộp thoại, trên lớp phủ mờ phía sau, hay chỗ khác hẳn) sẽ chờ
@@ -1203,14 +1203,23 @@ object YoutubeAdSkipper {
             // LẦN 2 (đã huỷ - không hiệu quả): giả lập phím Escape để YouTube tự đóng hộp thoại
             // bằng cơ chế của chính nó - không đóng được (YouTube không lắng nghe Escape ở hộp
             // thoại này, khác với giả định ban đầu).
-            // LẦN 3 (hiện tại): không cố đóng hộp thoại theo cách "đúng" của YouTube nữa - thay
-            // vào đó ĐIỀU HƯỚNG HẲN sang trang chủ, dứt điểm mọi hộp thoại/trạng thái kẹt đang có
-            // vì cả trang được thay mới hoàn toàn (không phải chỉ ẩn 1 phần tử).
+            // LẦN 3 (hiện tại - SỬA THÊM): bản trước điều hướng về trang chủ SAU 300ms bất kể lúc
+            // đó thực tế đang diễn ra gì, nên phá luôn các luồng NHIỀU BƯỚC của YouTube - ví dụ
+            // bấm "Thêm vào danh sách phát" sẽ MỞ TIẾP 1 hộp thoại con (chọn danh sách phát) chưa
+            // kịp hiện hẳn ra thì đã bị điều hướng mất, không thêm được. Giờ ngay TRƯỚC lúc điều
+            // hướng (đúng lúc hết 300ms), so sánh danh sách phần tử hộp thoại đang hiển thị với
+            // lúc BẮT ĐẦU cú chạm này: nếu xuất hiện phần tử MỚI (khác hẳn, không có trong lúc bắt
+            // đầu chạm) tức là cú chạm này vừa MỞ RA 1 hộp thoại con mới - HUỶ việc điều hướng lần
+            // này, để hộp thoại con đó yên cho người dùng thao tác tiếp; phải CHẠM THÊM 1 LẦN NỮA
+            // (áp dụng lại đúng logic này, lấy hộp thoại con mới làm mốc so sánh) mới thực sự điều
+            // hướng. Nếu không có phần tử mới (hộp thoại cũ đã đóng hẳn, hoặc vẫn y nguyên/kẹt) ->
+            // điều hướng về trang chủ như bình thường.
             //
-            // CHỦ Ý bỏ qua cú CHẠM VỪA MỞ hộp thoại: chỉ tính là "cần xử lý" nếu hộp thoại đã
-            // hiển thị SẴN TỪ TRƯỚC lúc bắt đầu chạm (ghi nhận ở touchstart/mousedown, trước khi
-            // cú chạm này kịp có cơ hội tự mở ra hộp thoại mới) - đúng ý muốn: "SAU KHI nó xuất
-            // hiện, chạm 1 phát MỚI xử lý", không phải xử lý ngay chính cú bấm 3 chấm ban đầu.
+            // CHỦ Ý bỏ qua cú CHẠM VỪA MỞ hộp thoại ĐẦU TIÊN: chỉ tính là "cần xử lý" nếu đã có ít
+            // nhất 1 hộp thoại hiển thị SẴN TỪ TRƯỚC lúc bắt đầu chạm (ghi nhận ở
+            // touchstart/mousedown, trước khi cú chạm này kịp có cơ hội tự mở ra hộp thoại mới) -
+            // đúng ý muốn: "SAU KHI nó xuất hiện, chạm 1 phát MỚI xử lý", không phải xử lý ngay
+            // chính cú bấm 3 chấm ban đầu.
             //
             // CHỦ Ý KHÔNG áp dụng cho menu Cài đặt (⚙) của TRÌNH PHÁT (.html5-video-player) - menu
             // đó cần thao tác nhiều bước qua lại (chọn "Chất lượng" -> chọn độ phân giải) trong
@@ -1219,7 +1228,8 @@ object YoutubeAdSkipper {
                 'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop, tp-yt-paper-dialog, ' +
                 'ytd-popup-container, [role="dialog"], [aria-modal="true"], ' +
                 'yt-sheet-view-model, ytm-modal-with-title-renderer';
-            function isAnyDialogVisibleNow() {
+            function getVisibleDialogElements() {
+                var result = [];
                 try {
                     var els = document.querySelectorAll(DIALOG_SELECTORS);
                     for (var i = 0; i < els.length; i++) {
@@ -1227,33 +1237,38 @@ object YoutubeAdSkipper {
                         if (el.closest && el.closest('.html5-video-player')) continue;
                         var st = window.getComputedStyle(el);
                         if (st.display === 'none' || parseFloat(st.opacity) === 0) continue;
-                        return true;
+                        result.push(el);
                     }
                 } catch (e) {}
-                return false;
+                return result;
             }
             var dialogOpenBeforeThisTouch = false;
+            var dialogElementsBeforeThisTouch = [];
             var goHomeTimer = null;
-            document.addEventListener('touchstart', function() {
-                dialogOpenBeforeThisTouch = isAnyDialogVisibleNow();
-            }, true);
-            document.addEventListener('mousedown', function() {
-                dialogOpenBeforeThisTouch = isAnyDialogVisibleNow();
-            }, true);
-            document.addEventListener('touchend', function() {
+            function recordDialogStateBeforeTouch() {
+                dialogElementsBeforeThisTouch = getVisibleDialogElements();
+                dialogOpenBeforeThisTouch = dialogElementsBeforeThisTouch.length > 0;
+            }
+            function scheduleGoHomeIfStillSameDialog() {
                 if (!dialogOpenBeforeThisTouch) return;
                 if (goHomeTimer) clearTimeout(goHomeTimer);
+                var beforeEls = dialogElementsBeforeThisTouch;
                 goHomeTimer = setTimeout(function() {
+                    var afterEls = getVisibleDialogElements();
+                    for (var i = 0; i < afterEls.length; i++) {
+                        if (beforeEls.indexOf(afterEls[i]) === -1) {
+                            // Có hộp thoại CON mới xuất hiện do chính cú chạm này mở ra - không
+                            // điều hướng, để yên cho người dùng thao tác tiếp trên hộp thoại đó.
+                            return;
+                        }
+                    }
                     window.location.href = 'https://www.youtube.com';
                 }, 300);
-            }, true);
-            document.addEventListener('mouseup', function() {
-                if (!dialogOpenBeforeThisTouch) return;
-                if (goHomeTimer) clearTimeout(goHomeTimer);
-                goHomeTimer = setTimeout(function() {
-                    window.location.href = 'https://www.youtube.com';
-                }, 300);
-            }, true);
+            }
+            document.addEventListener('touchstart', recordDialogStateBeforeTouch, true);
+            document.addEventListener('mousedown', recordDialogStateBeforeTouch, true);
+            document.addEventListener('touchend', scheduleGoHomeIfStillSameDialog, true);
+            document.addEventListener('mouseup', scheduleGoHomeIfStillSameDialog, true);
 
             // Lưu lại tốc độ phát do NGƯỜI DÙNG tự chọn (khác với tốc độ 30x do CHÍNH SCRIPT này
             // ép tạm để tua nhanh qua quảng cáo bên dưới) - để khôi phục lại ĐÚNG Ý người dùng
