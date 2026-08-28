@@ -1271,7 +1271,37 @@ object YoutubeAdSkipper {
                         }
                     }
                 } catch (e) {}
+                releasePageScrollLock();
             }
+
+            // FIX "không chạm/lướt được sau khi đóng hộp thoại": YouTube thường tự KHOÁ CUỘN
+            // TRANG NỀN (đặt overflow:hidden/position:fixed thẳng lên <html>/<body> qua style
+            // inline, đôi khi kèm touch-action:none) ngay khi mở 1 hộp thoại/lớp phủ, để trang
+            // phía sau không cuộn được trong lúc hộp thoại đang hiện - và chỉ tự GỠ khoá này lại
+            // ĐÚNG lúc gọi qua hàm đóng CHÍNH THỨC của nó. Vì forceCloseAnyOpenDialogNow() ép tắt
+            // bằng CSS trực tiếp (bỏ qua hàm đóng chính thức đó), cái khoá cuộn này có thể bị BỎ
+            // SÓT, không được gỡ theo - hộp thoại đã biến mất nhưng trang vẫn bị khoá cứng, không
+            // chạm/lướt được nữa dù nhìn giao diện không còn gì che khuất cả. CHỦ Ý chỉ gỡ đúng
+            // 2 thuộc tính hay dùng để khoá cuộn (overflow, touch-action) và CHỈ khi chúng được
+            // đặt qua STYLE INLINE (không đụng gì tới CSS trong file .css của YouTube) - không
+            // đụng position/top/width vì 1 số kỹ thuật khoá cuộn dùng chúng để "đóng băng" đúng vị
+            // trí cuộn hiện tại, gỡ nhầm có thể làm trang tự nhảy lên đầu.
+            function releasePageScrollLock() {
+                try {
+                    [document.documentElement, document.body].forEach(function(node) {
+                        if (!node || !node.style) return;
+                        if (node.style.overflow === 'hidden' || node.style.overflowY === 'hidden') {
+                            node.style.removeProperty('overflow');
+                            node.style.removeProperty('overflow-y');
+                            node.style.removeProperty('overflow-x');
+                        }
+                        if (node.style.touchAction === 'none') {
+                            node.style.removeProperty('touch-action');
+                        }
+                    });
+                } catch (e) {}
+            }
+
             // FIX "bấm 3 chấm: hộp thoại hiện lên xong tắt ngay lập tức, rồi mất cảm ứng luôn":
             // trước đây cứ CHẠM XONG (touchend/mouseup) là hẹn giờ ép tắt, KHÔNG phân biệt được
             // đây là chạm để MỞ hộp thoại (vd bấm đúng nút 3 chấm) hay chạm để ĐÓNG 1 hộp thoại
