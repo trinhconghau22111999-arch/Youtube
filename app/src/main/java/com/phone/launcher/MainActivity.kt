@@ -1272,6 +1272,7 @@ object YoutubeAdSkipper {
                     }
                 } catch (e) {}
                 releasePageScrollLock();
+                clearInvisibleTouchBlockers();
             }
 
             // FIX "không chạm/lướt được sau khi đóng hộp thoại": YouTube thường tự KHOÁ CUỘN
@@ -1299,6 +1300,44 @@ object YoutubeAdSkipper {
                             node.style.removeProperty('touch-action');
                         }
                     });
+                } catch (e) {}
+            }
+
+            // FIX (tiếp) "vẫn không chạm/lướt được dù đã gỡ khoá cuộn": nếu vẫn còn kẹt, khả năng
+            // KHÔNG phải do khoá cuộn hay do 1 trong các selector đã biết (tp-yt-iron-overlay-
+            // backdrop, tp-yt-paper-dialog...) - mà là 1 LỚP PHỦ VÔ HÌNH khác, gần như trong suốt
+            // (mắt thường không thấy gì) nhưng vẫn đang chặn chạm đúng ngay tại đó, thuộc 1 class/
+            // tên gọi mà mình CHƯA BIẾT (YouTube hay đổi tên/cấu trúc). Thay vì tiếp tục ĐOÁN tên
+            // class mới, hỏi thẳng trình duyệt bằng document.elementFromPoint(x, y) xem THỰC SỰ
+            // đang có phần tử nào nhận chạm tại vài điểm mẫu trên màn hình - phần tử nào định vị
+            // fixed/absolute, PHỦ RỘNG (>=50% màn hình mỗi chiều), và gần như trong suốt (opacity
+            // <= 0.3, tức khó lòng là 1 UI đang cố ý hiển thị rõ cho người dùng thấy) thì chắc
+            // chắn là 1 lớp phủ mồ côi kiểu này - vô hiệu hoá pointer-events của nó, không cần
+            // biết trước tên/class là gì. Chạy cả (1) ngay sau khi ép tắt hộp thoại, và (2) định
+            // kỳ trong vòng lặp chính bên dưới - để bắt được cả trường hợp lớp phủ này xuất hiện
+            // không do chính forceCloseAnyOpenDialogNow() gây ra (có thể là 1 lỗi khác hẳn của
+            // chính trang YouTube, không liên quan gì tới cơ chế ép tắt hộp thoại của chúng ta).
+            function clearInvisibleTouchBlockers() {
+                try {
+                    var w = window.innerWidth, h = window.innerHeight;
+                    var probePoints = [
+                        [w * 0.5, h * 0.5], [w * 0.5, h * 0.25], [w * 0.5, h * 0.75],
+                        [w * 0.2, h * 0.5], [w * 0.8, h * 0.5]
+                    ];
+                    for (var p = 0; p < probePoints.length; p++) {
+                        var el = document.elementFromPoint(probePoints[p][0], probePoints[p][1]);
+                        if (!el) continue;
+                        var tag = el.tagName;
+                        if (tag === 'HTML' || tag === 'BODY' || tag === 'VIDEO') continue;
+                        if (el.closest && el.closest('.html5-video-player')) continue;
+                        var st = window.getComputedStyle(el);
+                        if (st.position !== 'fixed' && st.position !== 'absolute') continue;
+                        var r = el.getBoundingClientRect();
+                        var coversLots = r.width >= w * 0.5 && r.height >= h * 0.5;
+                        if (!coversLots) continue;
+                        if (parseFloat(st.opacity) > 0.3) continue;
+                        el.style.setProperty('pointer-events', 'none', 'important');
+                    }
                 } catch (e) {}
             }
 
@@ -1535,6 +1574,7 @@ object YoutubeAdSkipper {
 
             setInterval(function() {
                 try {
+                    clearInvisibleTouchBlockers();
                     var skipBtn = document.querySelector(
                         '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, .videoAdUiSkipButton'
                     );
