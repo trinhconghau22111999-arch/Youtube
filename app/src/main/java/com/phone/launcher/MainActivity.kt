@@ -1190,24 +1190,31 @@ object YoutubeAdSkipper {
             if (window.__adSkipperRunning) return;
             window.__adSkipperRunning = true;
 
-            // TÍNH NĂNG MỚI: sau khi bấm nút 3 chấm (hoặc bất kỳ nút nào khác) mở ra 1 hộp thoại
-            // của YouTube (menu 3 chấm, "Lưu vào xem sau", "Chia sẻ", "Thêm vào danh sách phát",
-            // xác nhận xoá...) - CHẠM 1 PHÁT tiếp theo ở BẤT KỲ ĐÂU trên màn hình (kể cả ngay
-            // trên hộp thoại, trên lớp phủ mờ phía sau, hay chỗ khác hẳn) sẽ GIẢ LẬP PHÍM ESCAPE
-            // để YouTube tự đóng hộp thoại bằng ĐÚNG cơ chế đóng của chính nó (dispatch sự kiện
-            // bàn phím, KHÔNG can thiệp CSS/style ép display:none như cách đã thử trước đây và bị
-            // huỷ vì gây kẹt cảm ứng vĩnh viễn - xem lịch sử commit) - vì hộp thoại tự đóng qua
-            // đúng code JS nội bộ của nó nên tự dọn dẹp đúng mọi trạng thái liên quan (ARIA, class,
-            // backdrop...), tránh được nhóm lỗi "kẹt không tắt được / mất cảm ứng sau khi tắt".
+            // TÍNH NĂNG (đã sửa lại lần 2): sau khi bấm nút 3 chấm (hoặc bất kỳ nút nào khác) mở
+            // ra 1 hộp thoại của YouTube (menu 3 chấm, "Lưu vào xem sau", "Chia sẻ", "Thêm vào
+            // danh sách phát", xác nhận xoá...) - CHẠM 1 PHÁT tiếp theo ở BẤT KỲ ĐÂU trên màn
+            // hình (kể cả ngay trên hộp thoại, trên lớp phủ mờ phía sau, hay chỗ khác hẳn) sẽ chờ
+            // 300ms rồi ĐIỀU HƯỚNG THẲNG VỀ TRANG CHỦ YouTube (https://www.youtube.com) - KHÔNG
+            // phải tải lại (reload) đúng trang đang xem, mà là chuyển sang hẳn trang chủ.
             //
-            // CHỦ Ý bỏ qua cú CHẠM VỪA MỞ hộp thoại: chỉ coi là "cần đóng" nếu hộp thoại đã hiển
-            // thị SẴN TỪ TRƯỚC lúc bắt đầu chạm (ghi nhận ở touchstart/mousedown, trước khi cú
-            // chạm này kịp có cơ hội tự mở ra hộp thoại mới) - đúng ý muốn: "SAU KHI nó xuất hiện,
-            // chạm 1 phát MỚI đóng", không phải đóng ngay chính cú bấm 3 chấm ban đầu.
+            // LẦN 1 (đã huỷ): ép display:none/pointer-events bằng CSS trực tiếp lên element - gây
+            // kẹt cảm ứng vĩnh viễn vì nhiều component YouTube tái sử dụng lại đúng 1 node DOM cho
+            // mỗi lần mở sau (xem lịch sử commit).
+            // LẦN 2 (đã huỷ - không hiệu quả): giả lập phím Escape để YouTube tự đóng hộp thoại
+            // bằng cơ chế của chính nó - không đóng được (YouTube không lắng nghe Escape ở hộp
+            // thoại này, khác với giả định ban đầu).
+            // LẦN 3 (hiện tại): không cố đóng hộp thoại theo cách "đúng" của YouTube nữa - thay
+            // vào đó ĐIỀU HƯỚNG HẲN sang trang chủ, dứt điểm mọi hộp thoại/trạng thái kẹt đang có
+            // vì cả trang được thay mới hoàn toàn (không phải chỉ ẩn 1 phần tử).
+            //
+            // CHỦ Ý bỏ qua cú CHẠM VỪA MỞ hộp thoại: chỉ tính là "cần xử lý" nếu hộp thoại đã
+            // hiển thị SẴN TỪ TRƯỚC lúc bắt đầu chạm (ghi nhận ở touchstart/mousedown, trước khi
+            // cú chạm này kịp có cơ hội tự mở ra hộp thoại mới) - đúng ý muốn: "SAU KHI nó xuất
+            // hiện, chạm 1 phát MỚI xử lý", không phải xử lý ngay chính cú bấm 3 chấm ban đầu.
             //
             // CHỦ Ý KHÔNG áp dụng cho menu Cài đặt (⚙) của TRÌNH PHÁT (.html5-video-player) - menu
             // đó cần thao tác nhiều bước qua lại (chọn "Chất lượng" -> chọn độ phân giải) trong
-            // cùng 1 lượt mở, đóng ngay sau 1 chạm sẽ phá luôn khả năng thao tác nhiều bước đó.
+            // cùng 1 lượt mở, điều hướng đi ngay sau 1 chạm sẽ phá luôn khả năng thao tác đó.
             var DIALOG_SELECTORS =
                 'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop, tp-yt-paper-dialog, ' +
                 'ytd-popup-container, [role="dialog"], [aria-modal="true"], ' +
@@ -1225,14 +1232,8 @@ object YoutubeAdSkipper {
                 } catch (e) {}
                 return false;
             }
-            function simulateEscapeKey() {
-                try {
-                    var opts = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
-                    document.dispatchEvent(new KeyboardEvent('keydown', opts));
-                    document.dispatchEvent(new KeyboardEvent('keyup', opts));
-                } catch (e) {}
-            }
             var dialogOpenBeforeThisTouch = false;
+            var goHomeTimer = null;
             document.addEventListener('touchstart', function() {
                 dialogOpenBeforeThisTouch = isAnyDialogVisibleNow();
             }, true);
@@ -1241,11 +1242,17 @@ object YoutubeAdSkipper {
             }, true);
             document.addEventListener('touchend', function() {
                 if (!dialogOpenBeforeThisTouch) return;
-                simulateEscapeKey();
+                if (goHomeTimer) clearTimeout(goHomeTimer);
+                goHomeTimer = setTimeout(function() {
+                    window.location.href = 'https://www.youtube.com';
+                }, 300);
             }, true);
             document.addEventListener('mouseup', function() {
                 if (!dialogOpenBeforeThisTouch) return;
-                simulateEscapeKey();
+                if (goHomeTimer) clearTimeout(goHomeTimer);
+                goHomeTimer = setTimeout(function() {
+                    window.location.href = 'https://www.youtube.com';
+                }, 300);
             }, true);
 
             // Lưu lại tốc độ phát do NGƯỜI DÙNG tự chọn (khác với tốc độ 30x do CHÍNH SCRIPT này
