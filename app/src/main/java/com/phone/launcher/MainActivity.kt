@@ -1500,44 +1500,7 @@ object YoutubeAdSkipper {
                         }
                     }
 
-                    // ẨN NÚT 3 CHẤM (menu "..." trên từng video ở TRANG CHỦ - mở ra "Lưu vào
-                    // xem sau", "Không quan tâm"...) - CHỈ ở trang chủ (đường dẫn rỗng hoặc "/"),
-                    // KHÔNG đụng tới nút 3 chấm ở trang xem video/kết quả tìm kiếm/danh sách
-                    // phát vì chỉ riêng hộp thoại mở từ trang chủ mới bị kẹt không tắt được (xem
-                    // lý do ở đoạn xoá lịch sử/clearHistory() phía trên) - ẩn hẳn nút đi để không
-                    // ai bấm nhầm vào được nữa, thay vì cố sửa cho hộp thoại tắt đúng cách.
-                    // Dò theo NHIỀU selector khác nhau vì YouTube hay đổi tên class giữa các bản,
-                    // gồm cả thuộc tính aria-label (đa ngôn ngữ) để chắc ăn hơn dò theo class.
-                    if (location.pathname === '' || location.pathname === '/') {
-                        var menuBtnSelectors = [
-                            'ytm-menu-renderer button', 'ytd-menu-renderer button',
-                            'button[aria-label="Xem thêm tùy chọn"]',
-                            'button[aria-label="More options"]',
-                            'button[aria-label="Action menu"]',
-                            'button[aria-label="More actions"]',
-                            '.ytm-badge-and-buttons-renderer button'
-                        ];
-                        var menuBtns = document.querySelectorAll(menuBtnSelectors.join(', '));
-                        for (var mb = 0; mb < menuBtns.length; mb++) {
-                            menuBtns[mb].style.setProperty('display', 'none', 'important');
-                        }
-                    }
-
-                    // ẨN NÚT CÀI ĐẶT (bánh răng ⚙ trên trình phát - đổi chất lượng/tốc độ...) khi
-                    // video ĐANG PHÓNG TOÀN MÀN HÌNH (fullscreen thật, bấm nút fullscreen của
-                    // YouTube hoặc xoay ngang máy tự bật). KHÔNG ẩn khi player ở chế độ bình
-                    // thường (chưa fullscreen) - vẫn cần dùng nút cài đặt để đổi chất lượng/phụ
-                    // đề như thường. YouTube tự gắn class "ytp-fullscreen" lên khung trình phát
-                    // (.html5-video-player) đúng lúc đang fullscreen thật - dùng chính class đó
-                    // để biết trạng thái, không cần tự theo dõi sự kiện fullscreen riêng.
-                    var playerEl = document.querySelector('.html5-video-player');
-                    if (playerEl && playerEl.classList.contains('ytp-fullscreen')) {
-                        var settingsBtn = document.querySelector('.ytp-settings-button');
-                        if (settingsBtn) {
-                            settingsBtn.style.setProperty('display', 'none', 'important');
-                        }
-                    }
-
+                    // Nút/thẻ "Mở ứng dụng" (mời cài/mở app YouTube thật) ở đầu trang - selector
                     // CSS của YouTube hay đổi tên class nên KHÔNG đáng tin cậy 100%, dò thêm theo
                     // NỘI DUNG CHỮ (đa ngôn ngữ) để chắc chắn bắt được, dù YouTube đổi class.
                     var promoTexts = ['mở ứng dụng', 'open app', 'open the app', 'open in app'];
