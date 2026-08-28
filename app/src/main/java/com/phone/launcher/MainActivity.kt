@@ -1190,6 +1190,64 @@ object YoutubeAdSkipper {
             if (window.__adSkipperRunning) return;
             window.__adSkipperRunning = true;
 
+            // TÍNH NĂNG MỚI: sau khi bấm nút 3 chấm (hoặc bất kỳ nút nào khác) mở ra 1 hộp thoại
+            // của YouTube (menu 3 chấm, "Lưu vào xem sau", "Chia sẻ", "Thêm vào danh sách phát",
+            // xác nhận xoá...) - CHẠM 1 PHÁT tiếp theo ở BẤT KỲ ĐÂU trên màn hình (kể cả ngay
+            // trên hộp thoại, trên lớp phủ mờ phía sau, hay chỗ khác hẳn) sẽ GIẢ LẬP PHÍM ESCAPE
+            // để YouTube tự đóng hộp thoại bằng ĐÚNG cơ chế đóng của chính nó (dispatch sự kiện
+            // bàn phím, KHÔNG can thiệp CSS/style ép display:none như cách đã thử trước đây và bị
+            // huỷ vì gây kẹt cảm ứng vĩnh viễn - xem lịch sử commit) - vì hộp thoại tự đóng qua
+            // đúng code JS nội bộ của nó nên tự dọn dẹp đúng mọi trạng thái liên quan (ARIA, class,
+            // backdrop...), tránh được nhóm lỗi "kẹt không tắt được / mất cảm ứng sau khi tắt".
+            //
+            // CHỦ Ý bỏ qua cú CHẠM VỪA MỞ hộp thoại: chỉ coi là "cần đóng" nếu hộp thoại đã hiển
+            // thị SẴN TỪ TRƯỚC lúc bắt đầu chạm (ghi nhận ở touchstart/mousedown, trước khi cú
+            // chạm này kịp có cơ hội tự mở ra hộp thoại mới) - đúng ý muốn: "SAU KHI nó xuất hiện,
+            // chạm 1 phát MỚI đóng", không phải đóng ngay chính cú bấm 3 chấm ban đầu.
+            //
+            // CHỦ Ý KHÔNG áp dụng cho menu Cài đặt (⚙) của TRÌNH PHÁT (.html5-video-player) - menu
+            // đó cần thao tác nhiều bước qua lại (chọn "Chất lượng" -> chọn độ phân giải) trong
+            // cùng 1 lượt mở, đóng ngay sau 1 chạm sẽ phá luôn khả năng thao tác nhiều bước đó.
+            var DIALOG_SELECTORS =
+                'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop, tp-yt-paper-dialog, ' +
+                'ytd-popup-container, [role="dialog"], [aria-modal="true"], ' +
+                'yt-sheet-view-model, ytm-modal-with-title-renderer';
+            function isAnyDialogVisibleNow() {
+                try {
+                    var els = document.querySelectorAll(DIALOG_SELECTORS);
+                    for (var i = 0; i < els.length; i++) {
+                        var el = els[i];
+                        if (el.closest && el.closest('.html5-video-player')) continue;
+                        var st = window.getComputedStyle(el);
+                        if (st.display === 'none' || parseFloat(st.opacity) === 0) continue;
+                        return true;
+                    }
+                } catch (e) {}
+                return false;
+            }
+            function simulateEscapeKey() {
+                try {
+                    var opts = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+                    document.dispatchEvent(new KeyboardEvent('keydown', opts));
+                    document.dispatchEvent(new KeyboardEvent('keyup', opts));
+                } catch (e) {}
+            }
+            var dialogOpenBeforeThisTouch = false;
+            document.addEventListener('touchstart', function() {
+                dialogOpenBeforeThisTouch = isAnyDialogVisibleNow();
+            }, true);
+            document.addEventListener('mousedown', function() {
+                dialogOpenBeforeThisTouch = isAnyDialogVisibleNow();
+            }, true);
+            document.addEventListener('touchend', function() {
+                if (!dialogOpenBeforeThisTouch) return;
+                simulateEscapeKey();
+            }, true);
+            document.addEventListener('mouseup', function() {
+                if (!dialogOpenBeforeThisTouch) return;
+                simulateEscapeKey();
+            }, true);
+
             // Lưu lại tốc độ phát do NGƯỜI DÙNG tự chọn (khác với tốc độ 30x do CHÍNH SCRIPT này
             // ép tạm để tua nhanh qua quảng cáo bên dưới) - để khôi phục lại ĐÚNG Ý người dùng
             // bất cứ khi nào bị lệch, không chỉ ngay sau quảng cáo. Ngoài lưu tạm trong biến JS
