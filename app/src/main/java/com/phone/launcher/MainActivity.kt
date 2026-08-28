@@ -1271,76 +1271,7 @@ object YoutubeAdSkipper {
                         }
                     }
                 } catch (e) {}
-                releasePageScrollLock();
-                clearInvisibleTouchBlockers();
             }
-
-            // FIX "không chạm/lướt được sau khi đóng hộp thoại": YouTube thường tự KHOÁ CUỘN
-            // TRANG NỀN (đặt overflow:hidden/position:fixed thẳng lên <html>/<body> qua style
-            // inline, đôi khi kèm touch-action:none) ngay khi mở 1 hộp thoại/lớp phủ, để trang
-            // phía sau không cuộn được trong lúc hộp thoại đang hiện - và chỉ tự GỠ khoá này lại
-            // ĐÚNG lúc gọi qua hàm đóng CHÍNH THỨC của nó. Vì forceCloseAnyOpenDialogNow() ép tắt
-            // bằng CSS trực tiếp (bỏ qua hàm đóng chính thức đó), cái khoá cuộn này có thể bị BỎ
-            // SÓT, không được gỡ theo - hộp thoại đã biến mất nhưng trang vẫn bị khoá cứng, không
-            // chạm/lướt được nữa dù nhìn giao diện không còn gì che khuất cả. CHỦ Ý chỉ gỡ đúng
-            // 2 thuộc tính hay dùng để khoá cuộn (overflow, touch-action) và CHỈ khi chúng được
-            // đặt qua STYLE INLINE (không đụng gì tới CSS trong file .css của YouTube) - không
-            // đụng position/top/width vì 1 số kỹ thuật khoá cuộn dùng chúng để "đóng băng" đúng vị
-            // trí cuộn hiện tại, gỡ nhầm có thể làm trang tự nhảy lên đầu.
-            function releasePageScrollLock() {
-                try {
-                    [document.documentElement, document.body].forEach(function(node) {
-                        if (!node || !node.style) return;
-                        if (node.style.overflow === 'hidden' || node.style.overflowY === 'hidden') {
-                            node.style.removeProperty('overflow');
-                            node.style.removeProperty('overflow-y');
-                            node.style.removeProperty('overflow-x');
-                        }
-                        if (node.style.touchAction === 'none') {
-                            node.style.removeProperty('touch-action');
-                        }
-                    });
-                } catch (e) {}
-            }
-
-            // FIX (tiếp) "vẫn không chạm/lướt được dù đã gỡ khoá cuộn": nếu vẫn còn kẹt, khả năng
-            // KHÔNG phải do khoá cuộn hay do 1 trong các selector đã biết (tp-yt-iron-overlay-
-            // backdrop, tp-yt-paper-dialog...) - mà là 1 LỚP PHỦ VÔ HÌNH khác, gần như trong suốt
-            // (mắt thường không thấy gì) nhưng vẫn đang chặn chạm đúng ngay tại đó, thuộc 1 class/
-            // tên gọi mà mình CHƯA BIẾT (YouTube hay đổi tên/cấu trúc). Thay vì tiếp tục ĐOÁN tên
-            // class mới, hỏi thẳng trình duyệt bằng document.elementFromPoint(x, y) xem THỰC SỰ
-            // đang có phần tử nào nhận chạm tại vài điểm mẫu trên màn hình - phần tử nào định vị
-            // fixed/absolute, PHỦ RỘNG (>=50% màn hình mỗi chiều), và gần như trong suốt (opacity
-            // <= 0.3, tức khó lòng là 1 UI đang cố ý hiển thị rõ cho người dùng thấy) thì chắc
-            // chắn là 1 lớp phủ mồ côi kiểu này - vô hiệu hoá pointer-events của nó, không cần
-            // biết trước tên/class là gì. Chạy cả (1) ngay sau khi ép tắt hộp thoại, và (2) định
-            // kỳ trong vòng lặp chính bên dưới - để bắt được cả trường hợp lớp phủ này xuất hiện
-            // không do chính forceCloseAnyOpenDialogNow() gây ra (có thể là 1 lỗi khác hẳn của
-            // chính trang YouTube, không liên quan gì tới cơ chế ép tắt hộp thoại của chúng ta).
-            function clearInvisibleTouchBlockers() {
-                try {
-                    var w = window.innerWidth, h = window.innerHeight;
-                    var probePoints = [
-                        [w * 0.5, h * 0.5], [w * 0.5, h * 0.25], [w * 0.5, h * 0.75],
-                        [w * 0.2, h * 0.5], [w * 0.8, h * 0.5]
-                    ];
-                    for (var p = 0; p < probePoints.length; p++) {
-                        var el = document.elementFromPoint(probePoints[p][0], probePoints[p][1]);
-                        if (!el) continue;
-                        var tag = el.tagName;
-                        if (tag === 'HTML' || tag === 'BODY' || tag === 'VIDEO') continue;
-                        if (el.closest && el.closest('.html5-video-player')) continue;
-                        var st = window.getComputedStyle(el);
-                        if (st.position !== 'fixed' && st.position !== 'absolute') continue;
-                        var r = el.getBoundingClientRect();
-                        var coversLots = r.width >= w * 0.5 && r.height >= h * 0.5;
-                        if (!coversLots) continue;
-                        if (parseFloat(st.opacity) > 0.3) continue;
-                        el.style.setProperty('pointer-events', 'none', 'important');
-                    }
-                } catch (e) {}
-            }
-
             // FIX "bấm 3 chấm: hộp thoại hiện lên xong tắt ngay lập tức, rồi mất cảm ứng luôn":
             // trước đây cứ CHẠM XONG (touchend/mouseup) là hẹn giờ ép tắt, KHÔNG phân biệt được
             // đây là chạm để MỞ hộp thoại (vd bấm đúng nút 3 chấm) hay chạm để ĐÓNG 1 hộp thoại
@@ -1574,7 +1505,6 @@ object YoutubeAdSkipper {
 
             setInterval(function() {
                 try {
-                    clearInvisibleTouchBlockers();
                     var skipBtn = document.querySelector(
                         '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, .videoAdUiSkipButton'
                     );
