@@ -1255,12 +1255,18 @@ object YoutubeAdSkipper {
                         // (tp-yt-paper-dialog, [role="dialog"]...) vì chưa có vòng lặp nào khác tự
                         // canh chừng lại chúng - gỡ tạm rồi lỡ hộp thoại chưa thật sự đóng (theo ý
                         // YouTube) sẽ tự hiện lại sau 1,5s dù không ai chạm gì, gây khó chịu hơn.
+                        // ĐỘ TRỄ 400ms (không phải 0ms, cũng không cần dài hơn): chỉ cần đủ để
+                        // hiệu ứng đóng CSS/JS của YouTube (nếu có tự chạy) kịp hoàn tất - hiệu
+                        // ứng đóng bình thường của YouTube tối đa cỡ 200-300ms, không cần dài
+                        // hơn. Càng gỡ SỚM, nếu chẳng may nó vẫn thật sự kẹt thì vòng lặp
+                        // stuckBackdrops (bên dưới) càng có cơ hội bắt đầu đếm 1,5s của NÓ sớm
+                        // hơn - tổng thời gian nhấp nháy trước khi bị ép tắt lại sẽ NGẮN hơn.
                         if (el.matches && el.matches('tp-yt-iron-overlay-backdrop, iron-overlay-backdrop')) {
                             (function(target) {
                                 setTimeout(function() {
                                     target.style.removeProperty('display');
                                     target.style.removeProperty('pointer-events');
-                                }, 1500);
+                                }, 400);
                             })(el);
                         }
                     }
