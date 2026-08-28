@@ -1215,7 +1215,19 @@ object YoutubeAdSkipper {
                 'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop, tp-yt-paper-dialog, ' +
                 'ytd-popup-container, [role="dialog"], [aria-modal="true"], ' +
                 'yt-sheet-view-model, ytm-modal-with-title-renderer';
-            var closeDialogsTimer = null;
+            function isAnyDialogVisibleNow() {
+                try {
+                    var els = document.querySelectorAll(DIALOG_SELECTORS);
+                    for (var i = 0; i < els.length; i++) {
+                        var el = els[i];
+                        if (el.closest && el.closest('.html5-video-player')) continue;
+                        var st = window.getComputedStyle(el);
+                        if (st.display === 'none' || parseFloat(st.opacity) === 0) continue;
+                        return true;
+                    }
+                } catch (e) {}
+                return false;
+            }
             function forceCloseAnyOpenDialogNow() {
                 try {
                     var els = document.querySelectorAll(DIALOG_SELECTORS);
@@ -1229,11 +1241,31 @@ object YoutubeAdSkipper {
                     }
                 } catch (e) {}
             }
+            // FIX "bấm 3 chấm: hộp thoại hiện lên xong tắt ngay lập tức, rồi mất cảm ứng luôn":
+            // trước đây cứ CHẠM XONG (touchend/mouseup) là hẹn giờ ép tắt, KHÔNG phân biệt được
+            // đây là chạm để MỞ hộp thoại (vd bấm đúng nút 3 chấm) hay chạm để ĐÓNG 1 hộp thoại
+            // đã đang mở từ trước - hộp thoại vừa mở ra bởi CHÍNH cú chạm đó, đúng 60ms sau bị
+            // chính cú chạm đó tự đóng luôn, kèm theo trạng thái nội bộ của YouTube bị rối (đang
+            // "mở dialog" nhưng lại bị ép ẩn bằng CSS thay vì tự đóng đúng cách) khiến cảm ứng bị
+            // chặn theo. Nay CHỈ hẹn giờ ép tắt nếu ĐÃ CÓ hộp thoại hiển thị SẴN TỪ TRƯỚC lúc bắt
+            // đầu chạm (ghi lại ở touchstart/mousedown, trước khi cú chạm này có cơ hội tự mở ra
+            // hộp thoại mới nào) - đúng ý muốn ban đầu: "hộp thoại ĐANG MỞ, chạm 1 phát là tắt",
+            // không áp dụng cho chính cú chạm vừa mở nó ra.
+            var dialogOpenBeforeThisTouch = false;
+            document.addEventListener('touchstart', function() {
+                dialogOpenBeforeThisTouch = isAnyDialogVisibleNow();
+            }, true);
+            document.addEventListener('mousedown', function() {
+                dialogOpenBeforeThisTouch = isAnyDialogVisibleNow();
+            }, true);
+            var closeDialogsTimer = null;
             document.addEventListener('touchend', function() {
+                if (!dialogOpenBeforeThisTouch) return;
                 if (closeDialogsTimer) clearTimeout(closeDialogsTimer);
                 closeDialogsTimer = setTimeout(forceCloseAnyOpenDialogNow, TOUCH_CLOSE_DELAY_MS);
             }, true);
             document.addEventListener('mouseup', function() {
+                if (!dialogOpenBeforeThisTouch) return;
                 if (closeDialogsTimer) clearTimeout(closeDialogsTimer);
                 closeDialogsTimer = setTimeout(forceCloseAnyOpenDialogNow, TOUCH_CLOSE_DELAY_MS);
             }, true);
