@@ -1238,6 +1238,31 @@ object YoutubeAdSkipper {
                         if (st.display === 'none' || parseFloat(st.opacity) === 0) continue;
                         el.style.setProperty('display', 'none', 'important');
                         el.style.setProperty('pointer-events', 'none', 'important');
+                        // KHÔNG được để 2 thuộc tính ép ở trên dính MÃI MÃI trên node này - nhiều
+                        // thư viện UI của YouTube (Polymer...) TÁI SỬ DỤNG lại đúng 1 node DOM
+                        // cho MỖI LẦN mở hộp thoại sau, không tạo node mới mỗi lần. Nếu cứ để
+                        // "display:none/pointer-events:none !important" dính mãi, lần mở hộp
+                        // thoại HỢP LỆ tiếp theo tái dùng đúng node này (YouTube chỉ tự đổi lại
+                        // class/opacity riêng của nó, không biết gì tới style ép của chúng ta) có
+                        // thể vẫn bị che khuất/không nhận chạm - đây rất có thể là nguyên nhân
+                        // thật của "mất cảm ứng luôn": không phải mất ngay lúc tắt, mà là hộp
+                        // thoại/khu vực đó không còn dùng lại được nữa vì vẫn còn sót style ép từ
+                        // lần tắt trước. CHỈ áp dụng gỡ bỏ này cho đúng class backdrop CŨ
+                        // (tp-yt-iron-overlay-backdrop/iron-overlay-backdrop) - class này ĐÃ có
+                        // sẵn 1 vòng lặp riêng (stuckBackdrops, bên dưới, chạy mỗi 200ms) tự phát
+                        // hiện lại và ép tắt tiếp NẾU nó thật sự còn kẹt, nên gỡ tạm không sợ nó
+                        // hiện lại vĩnh viễn mà không ai hay. KHÔNG áp dụng cho các selector khác
+                        // (tp-yt-paper-dialog, [role="dialog"]...) vì chưa có vòng lặp nào khác tự
+                        // canh chừng lại chúng - gỡ tạm rồi lỡ hộp thoại chưa thật sự đóng (theo ý
+                        // YouTube) sẽ tự hiện lại sau 1,5s dù không ai chạm gì, gây khó chịu hơn.
+                        if (el.matches && el.matches('tp-yt-iron-overlay-backdrop, iron-overlay-backdrop')) {
+                            (function(target) {
+                                setTimeout(function() {
+                                    target.style.removeProperty('display');
+                                    target.style.removeProperty('pointer-events');
+                                }, 1500);
+                            })(el);
+                        }
                     }
                 } catch (e) {}
             }
