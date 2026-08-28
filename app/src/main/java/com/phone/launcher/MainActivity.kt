@@ -1190,6 +1190,54 @@ object YoutubeAdSkipper {
             if (window.__adSkipperRunning) return;
             window.__adSkipperRunning = true;
 
+            // MẶC ĐỊNH: bất kỳ hộp thoại/lớp phủ nào của YouTube đang mở (menu 3 chấm, "Lưu vào
+            // xem sau", "Chia sẻ", "Thêm vào danh sách phát", xác nhận xoá...) - chỉ cần 1 CHẠM ở
+            // BẤT KỲ ĐÂU trên màn hình (kể cả chạm ngay trên hộp thoại, trên lớp phủ mờ phía sau,
+            // hay ở chỗ khác hẳn ngoài cả hai) là hộp thoại đó phải TẮT HẲN ngay - không cần chạm
+            // đúng ra ngoài/vuốt xuống như quy ước gốc của YouTube. Đây là giải pháp TRIỆT ĐỂ cho
+            // toàn bộ nhóm lỗi "hộp thoại bị kẹt không tắt được" đã gặp đi gặp lại (nguyên nhân
+            // gốc mỗi lần một khác, rất khó dò hết) - thay vì tiếp tục vá từng nguyên nhân, chặn
+            // hẳn khả năng bất kỳ hộp thoại nào có thể kẹt quá 1 chạm.
+            //
+            // CHỦ Ý KHÔNG chặn (preventDefault/stopPropagation) chạm gốc: để hành động người dùng
+            // định làm (vd bấm đúng vào mục "Lưu vào xem sau") vẫn chạy bình thường trước - đợi
+            // TOUCH_CLOSE_DELAY_MS (đủ để hành động đó tự xử lý) rồi mới quét và ép tắt CƯỠNG BỨC
+            // mọi hộp thoại còn đang hiện, dù hộp thoại đó đã tự đóng đúng cách hay đang kẹt.
+            //
+            // CHỦ Ý KHÔNG đụng tới menu Cài đặt (⚙) của TRÌNH PHÁT (.html5-video-player, class
+            // .ytp-popup/.ytp-settings-menu) - menu đó cần thao tác NHIỀU BƯỚC qua lại (bấm "Chất
+            // lượng" -> mở danh sách độ phân giải -> chọn 1 mục) trong CÙNG 1 lượt mở, ép tắt sau
+            // mỗi chạm sẽ phá luôn khả năng đó. Menu này cũng chưa từng bị kẹt như các hộp thoại
+            // trang (nó là 1 lớp UI hoàn toàn khác của trình phát, không dùng chung cơ chế
+            // "backdrop"/"dialog" kiểu Material của YouTube).
+            var TOUCH_CLOSE_DELAY_MS = 60;
+            var DIALOG_SELECTORS =
+                'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop, tp-yt-paper-dialog, ' +
+                'ytd-popup-container, [role="dialog"], [aria-modal="true"], ' +
+                'yt-sheet-view-model, ytm-modal-with-title-renderer';
+            var closeDialogsTimer = null;
+            function forceCloseAnyOpenDialogNow() {
+                try {
+                    var els = document.querySelectorAll(DIALOG_SELECTORS);
+                    for (var i = 0; i < els.length; i++) {
+                        var el = els[i];
+                        if (el.closest && el.closest('.html5-video-player')) continue;
+                        var st = window.getComputedStyle(el);
+                        if (st.display === 'none' || parseFloat(st.opacity) === 0) continue;
+                        el.style.setProperty('display', 'none', 'important');
+                        el.style.setProperty('pointer-events', 'none', 'important');
+                    }
+                } catch (e) {}
+            }
+            document.addEventListener('touchend', function() {
+                if (closeDialogsTimer) clearTimeout(closeDialogsTimer);
+                closeDialogsTimer = setTimeout(forceCloseAnyOpenDialogNow, TOUCH_CLOSE_DELAY_MS);
+            }, true);
+            document.addEventListener('mouseup', function() {
+                if (closeDialogsTimer) clearTimeout(closeDialogsTimer);
+                closeDialogsTimer = setTimeout(forceCloseAnyOpenDialogNow, TOUCH_CLOSE_DELAY_MS);
+            }, true);
+
             // Lưu lại tốc độ phát do NGƯỜI DÙNG tự chọn (khác với tốc độ 30x do CHÍNH SCRIPT này
             // ép tạm để tua nhanh qua quảng cáo bên dưới) - để khôi phục lại ĐÚNG Ý người dùng
             // bất cứ khi nào bị lệch, không chỉ ngay sau quảng cáo. Ngoài lưu tạm trong biến JS
