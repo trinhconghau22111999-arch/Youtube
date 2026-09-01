@@ -47,8 +47,8 @@ Daemon will be stopped at the end of the build
 
 > Task :app:compileDebugKotlin
 w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/IncognitoActivity.kt:270:22 'setter for saveFormData: Boolean' is deprecated. Deprecated in Java
-w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:940:23 'onBackPressed(): Unit' is deprecated. Deprecated in Java
-w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:988:19 'onBackPressed(): Unit' is deprecated. Deprecated in Java
+w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:910:23 'onBackPressed(): Unit' is deprecated. Deprecated in Java
+w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher/MainActivity.kt:958:19 'onBackPressed(): Unit' is deprecated. Deprecated in Java
 
 > Task :app:compileDebugJavaWithJavac NO-SOURCE
 > Task :app:dexBuilderDebug
@@ -60,7 +60,7 @@ w: file:///home/runner/work/Youtube/Youtube/app/src/main/java/com/phone/launcher
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 1m 25s
+BUILD SUCCESSFUL in 1m 26s
 35 actionable tasks: 35 executed
 
 === APK thực tế tìm thấy sau build (find app/build/outputs -iname '*.apk') ===
