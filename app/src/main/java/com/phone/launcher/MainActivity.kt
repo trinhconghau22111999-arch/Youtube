@@ -1293,13 +1293,15 @@ object YoutubeAdSkipper {
                     var afterSig = getDialogContentSignature();
                     if (afterSig.length > 0 && afterSig !== beforeSig) {
                         // Hộp thoại vẫn đang hiện NHƯNG nội dung đã đổi (mở tiếp bước con, đổi
-                        // sang danh sách khác...) - không điều hướng, để yên cho người dùng thao
-                        // tác tiếp. KHÔNG cần tự gọi lại recordDialogStateBeforeTouch() ở đây -
-                        // cú chạm KẾ TIẾP của người dùng sẽ tự kích hoạt lại đúng logic này qua
-                        // touchstart/mousedown, lấy đúng nội dung MỚI làm mốc so sánh mới.
+                        // sang danh sách khác...) - không làm gì, để yên cho người dùng thao tác
+                        // tiếp. Cú chạm KẾ TIẾP sẽ tự kích hoạt lại đúng logic này qua touchstart.
                         return;
                     }
-                    window.location.href = 'https://www.youtube.com';
+                    // Khôi phục trang chủ về đúng trạng thái TRƯỚC khi bất kỳ hộp thoại nào mở
+                    // ra: YouTube luôn tự pushState() khi mở hộp thoại (để Back vật lý cũng đóng
+                    // được) - gọi history.back() là đủ để JS history quay về đúng thời điểm trước
+                    // đó mà KHÔNG tải lại trang, không mất trạng thái đang xem.
+                    try { history.back(); } catch (e) {}
                 }, 300);
             }
             document.addEventListener('touchstart', recordDialogStateBeforeTouch, true);
