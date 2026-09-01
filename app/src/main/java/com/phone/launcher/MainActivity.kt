@@ -893,37 +893,7 @@ class MainActivity : AppCompatActivity() {
             // là 1 trang con khác của YouTube, ví dụ trang kênh/tìm kiếm còn sót trong lịch sử,
             // khiến người dùng cảm giác "chưa ra khỏi YouTube"). Xem exitYoutube().
             YoutubeAdSkipper.isYoutube(currentUrl) && YoutubeAdSkipper.isYoutubeHome(currentUrl) -> {
-                // Đang ở trang chủ YouTube: trước tiên hỏi JS xem có hộp thoại nào đang mở không.
-                // Nếu có -> history.back() để khôi phục trạng thái trước khi hộp thoại xuất hiện
-                // (YouTube tự pushState() khi mở hộp thoại, back() đóng đúng cách không tải lại
-                // trang) - CÙNG cơ chế với "chạm ngoài hộp thoại" đã làm ở JS. Nếu không có ->
-                // thoát YouTube như bình thường qua exitYoutube().
-                webView.evaluateJavascript("""
-                    (function() {
-                        var DIALOG_SELECTORS =
-                            'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop, tp-yt-paper-dialog, ' +
-                            'ytd-popup-container, [role="dialog"], [aria-modal="true"], ' +
-                            'yt-sheet-view-model, ytm-modal-with-title-renderer';
-                        var els = document.querySelectorAll(DIALOG_SELECTORS);
-                        for (var i = 0; i < els.length; i++) {
-                            var el = els[i];
-                            if (el.closest && el.closest('.html5-video-player')) continue;
-                            var st = window.getComputedStyle(el);
-                            if (st.display !== 'none' && parseFloat(st.opacity) !== 0) return 'yes';
-                        }
-                        return 'no';
-                    })()
-                """.trimIndent()) { result ->
-                    val hasDialog = result?.trim('"') == "yes"
-                    if (hasDialog) {
-                        runOnUiThread {
-                            programmaticLoad = true
-                            webView.evaluateJavascript("history.back();", null)
-                        }
-                    } else {
-                        runOnUiThread { exitYoutube() }
-                    }
-                }
+                exitYoutube()
             }
             webView.canGoBack() -> {
                 programmaticLoad = true
@@ -1323,15 +1293,13 @@ object YoutubeAdSkipper {
                     var afterSig = getDialogContentSignature();
                     if (afterSig.length > 0 && afterSig !== beforeSig) {
                         // Hộp thoại vẫn đang hiện NHƯNG nội dung đã đổi (mở tiếp bước con, đổi
-                        // sang danh sách khác...) - không làm gì, để yên cho người dùng thao tác
-                        // tiếp. Cú chạm KẾ TIẾP sẽ tự kích hoạt lại đúng logic này qua touchstart.
+                        // sang danh sách khác...) - không điều hướng, để yên cho người dùng thao
+                        // tác tiếp. KHÔNG cần tự gọi lại recordDialogStateBeforeTouch() ở đây -
+                        // cú chạm KẾ TIẾP của người dùng sẽ tự kích hoạt lại đúng logic này qua
+                        // touchstart/mousedown, lấy đúng nội dung MỚI làm mốc so sánh mới.
                         return;
                     }
-                    // Khôi phục trang chủ về đúng trạng thái TRƯỚC khi bất kỳ hộp thoại nào mở
-                    // ra: YouTube luôn tự pushState() khi mở hộp thoại (để Back vật lý cũng đóng
-                    // được) - gọi history.back() là đủ để JS history quay về đúng thời điểm trước
-                    // đó mà KHÔNG tải lại trang, không mất trạng thái đang xem.
-                    try { history.back(); } catch (e) {}
+                    window.location.href = 'https://www.youtube.com';
                 }, 300);
             }
             document.addEventListener('touchstart', recordDialogStateBeforeTouch, true);
