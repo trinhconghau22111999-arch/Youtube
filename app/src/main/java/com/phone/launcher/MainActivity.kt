@@ -893,7 +893,37 @@ class MainActivity : AppCompatActivity() {
             // là 1 trang con khác của YouTube, ví dụ trang kênh/tìm kiếm còn sót trong lịch sử,
             // khiến người dùng cảm giác "chưa ra khỏi YouTube"). Xem exitYoutube().
             YoutubeAdSkipper.isYoutube(currentUrl) && YoutubeAdSkipper.isYoutubeHome(currentUrl) -> {
-                exitYoutube()
+                // Đang ở trang chủ YouTube: trước tiên hỏi JS xem có hộp thoại nào đang mở không.
+                // Nếu có -> history.back() để khôi phục trạng thái trước khi hộp thoại xuất hiện
+                // (YouTube tự pushState() khi mở hộp thoại, back() đóng đúng cách không tải lại
+                // trang) - CÙNG cơ chế với "chạm ngoài hộp thoại" đã làm ở JS. Nếu không có ->
+                // thoát YouTube như bình thường qua exitYoutube().
+                webView.evaluateJavascript("""
+                    (function() {
+                        var DIALOG_SELECTORS =
+                            'tp-yt-iron-overlay-backdrop, iron-overlay-backdrop, tp-yt-paper-dialog, ' +
+                            'ytd-popup-container, [role="dialog"], [aria-modal="true"], ' +
+                            'yt-sheet-view-model, ytm-modal-with-title-renderer';
+                        var els = document.querySelectorAll(DIALOG_SELECTORS);
+                        for (var i = 0; i < els.length; i++) {
+                            var el = els[i];
+                            if (el.closest && el.closest('.html5-video-player')) continue;
+                            var st = window.getComputedStyle(el);
+                            if (st.display !== 'none' && parseFloat(st.opacity) !== 0) return 'yes';
+                        }
+                        return 'no';
+                    })()
+                """.trimIndent()) { result ->
+                    val hasDialog = result?.trim('"') == "yes"
+                    if (hasDialog) {
+                        runOnUiThread {
+                            programmaticLoad = true
+                            webView.evaluateJavascript("history.back();", null)
+                        }
+                    } else {
+                        runOnUiThread { exitYoutube() }
+                    }
+                }
             }
             webView.canGoBack() -> {
                 programmaticLoad = true
